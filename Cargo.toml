@@ -1,0 +1,12 @@
+[package]
+name = "dsp-stuff"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+console-subscriber = "0.1.0"
+cpal = { version = "0.13.4", features = ["jack", "asio"] }
+rivulet = { git = "https://github.com/simmsb/rivulet", rev = "2a18019978bdcb4605faeda39775d33bc2e08dc2" }
+tokio = { version = "1.15.0", features = ["rt", "time", "macros", "rt-multi-thread"] }
