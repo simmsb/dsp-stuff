@@ -1,3 +1,4 @@
+use collect_slice::CollectSlice;
 use std::error::Error;
 
 use cpal::traits::StreamTrait;
@@ -14,10 +15,29 @@ async fn do_copy(
     loop {
         in_.grant(buf_size).await.map_err(|_| "input died")?;
         out.grant(buf_size).await.map_err(|_| "output died")?;
-        out.view_mut()[..buf_size].copy_from_slice(&in_.view()[..buf_size]);
+
+        in_.view()[..buf_size]
+            .iter()
+            .cloned()
+            .map(do_distort)
+            .collect_slice(&mut out.view_mut()[..buf_size]);
+
         in_.release(buf_size);
         out.release(buf_size);
     }
+}
+
+fn do_distort(sample: f32) -> f32 {
+    let sample = sample * 70.0;
+    let sample = if sample > 1.0 {
+        2.0 / 3.0
+    } else if (-1.0 <= sample) && (sample <= 1.0) {
+        sample
+    } else {
+        -2.0 / 3.0
+    };
+
+    sample / 70.0
 }
 
 #[tokio::main]

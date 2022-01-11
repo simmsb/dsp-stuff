@@ -254,6 +254,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "collect_slice"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fcf7ebe98d2f8eba5ecf08e7ffa74384eea74b35d2fdee7aa417cf3a9cbe658"
+
+[[package]]
 name = "combine"
 version = "4.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -433,6 +439,7 @@ dependencies = [
 name = "dsp-stuff"
 version = "0.1.0"
 dependencies = [
+ "collect_slice",
  "console-subscriber",
  "cpal",
  "rivulet",

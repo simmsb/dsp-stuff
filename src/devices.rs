@@ -26,6 +26,7 @@ pub fn input_stream() -> (cpal::Stream, impl View<Item = f32>) {
     };
 
     let mut cfg_v = cfg.config();
+    cfg_v.channels = 1;
 
     cfg_v.buffer_size = match cfg_v.buffer_size {
         cpal::BufferSize::Default => cpal::BufferSize::Fixed(lowest_buf_size),
@@ -85,6 +86,7 @@ pub fn output_stream() -> (cpal::Stream, impl ViewMut<Item = f32>) {
     };
 
     let mut cfg_v = cfg.config();
+    cfg_v.channels = 1;
 
     cfg_v.buffer_size = match cfg_v.buffer_size {
         cpal::BufferSize::Default => cpal::BufferSize::Fixed(lowest_buf_size),
