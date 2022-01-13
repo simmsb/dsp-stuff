@@ -6,8 +6,19 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+arc-swap = "1.5.0"
+async-trait = "0.1.52"
+atomic_float = "0.1.0"
 collect_slice = "1.2.0"
+color-eyre = "0.6.0"
 console-subscriber = "0.1.0"
 cpal = { version = "0.13.4", features = ["jack", "asio"] }
-rivulet = { git = "https://github.com/simmsb/rivulet", rev = "2a18019978bdcb4605faeda39775d33bc2e08dc2" }
+eframe = { version = "0.16.0", features = ["default_fonts", "egui_glow"], default-features = false }
+egui = "0.16.1"
+egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git" }
+itertools = "0.10.3"
+rivulet = { git = "https://github.com/simmsb/rivulet", rev = "b2416e5e7eb87162d693c74ed62df33e252e9647" }
 tokio = { version = "1.15.0", features = ["rt", "time", "macros", "rt-multi-thread"] }
+tracing = "0.1.29"
+tracing-error = "0.2.0"
+tracing-subscriber = { version = "0.3.5", features = ["env-filter"] }

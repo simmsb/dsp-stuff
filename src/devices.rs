@@ -1,7 +1,7 @@
 use cpal::traits::{DeviceTrait, HostTrait};
-use rivulet::{SplittableView, View, ViewMut};
+use rivulet::{SplittableView, View, ViewMut, splittable, circular_buffer::{Source, Sink}};
 
-pub fn input_stream() -> (cpal::Stream, impl View<Item = f32>) {
+pub fn input_stream() -> (cpal::Device, cpal::Stream, splittable::View<Source<f32>>) {
     println!("{:#?}", cpal::available_hosts());
 
     let host = cpal::host_from_id(
@@ -50,7 +50,7 @@ pub fn input_stream() -> (cpal::Stream, impl View<Item = f32>) {
                     buf[..data.len()].copy_from_slice(data);
                     sink.release(data.len());
                 } else {
-                    println!("input fuck");
+                    // println!("input fuck");
                     // input will fall behind
                 };
             },
@@ -60,10 +60,10 @@ pub fn input_stream() -> (cpal::Stream, impl View<Item = f32>) {
         )
         .unwrap();
 
-    (stream, source.into_view())
+    (dev, stream, source.into_view())
 }
 
-pub fn output_stream() -> (cpal::Stream, impl ViewMut<Item = f32>) {
+pub fn output_stream() -> (cpal::Device, cpal::Stream, Sink<f32>) {
     let host = cpal::host_from_id(
         cpal::available_hosts()
             .into_iter()
@@ -109,7 +109,7 @@ pub fn output_stream() -> (cpal::Stream, impl ViewMut<Item = f32>) {
                     data.copy_from_slice(&buf[..data.len()]);
                     source.release(data.len());
                 } else {
-                    println!("output fuck");
+                    // println!("output fuck");
                     // oops
                 };
             },
@@ -119,5 +119,5 @@ pub fn output_stream() -> (cpal::Stream, impl ViewMut<Item = f32>) {
         )
         .unwrap();
 
-    (stream, sink)
+    (dev, stream, sink)
 }
