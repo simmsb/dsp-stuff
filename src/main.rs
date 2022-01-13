@@ -1,7 +1,3 @@
-use collect_slice::CollectSlice;
-use std::error::Error;
-
-use cpal::traits::StreamTrait;
 mod devices;
 mod ids;
 mod node;
