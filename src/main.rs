@@ -3,6 +3,7 @@ mod ids;
 mod node;
 mod nodes;
 mod runtime;
+mod theme;
 
 // async fn do_copy(
 //     mut in_: impl View<Item = f32>,

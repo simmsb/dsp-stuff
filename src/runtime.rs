@@ -2,8 +2,10 @@ use crate::{
     ids::{LinkId, NodeId, PortId},
     node::Perform,
     nodes,
+    theme::{self, Theme},
 };
-use egui_nodes::{LinkArgs, NodeArgs, NodeConstructor, PinArgs};
+use egui::Visuals;
+use egui_nodes::{LinkArgs, NodeArgs, NodeConstructor, PinArgs, AttributeFlags, ColorStyle};
 use itertools::Itertools;
 use rivulet::{
     circular_buffer::{Sink, Source},
@@ -18,6 +20,8 @@ use tokio::sync::Mutex;
 
 pub struct UiContext {
     runtime: tokio::runtime::Runtime,
+
+    theme: &'static Theme,
 
     node_ctx: egui_nodes::Context,
 
@@ -36,14 +40,22 @@ impl UiContext {
             .build()
             .unwrap();
 
-        Self {
+        let mut node_ctx = egui_nodes::Context::default();
+        node_ctx.attribute_flag_push(AttributeFlags::EnableLinkDetachWithDragClick);
+
+        let mut this = Self {
             runtime,
-            node_ctx: egui_nodes::Context::default(),
+            node_ctx,
+            theme: &theme::MONOKAI,
             links: HashMap::new(),
             inputs: HashMap::new(),
             outputs: HashMap::new(),
             nodes: HashMap::new(),
-        }
+        };
+
+        this.update_theme(&theme::MONOKAI);
+
+        this
     }
 
     fn add_link(&mut self, lhs: (NodeId, PortId), rhs: (NodeId, PortId)) {
@@ -149,10 +161,9 @@ impl UiContext {
             n
         });
 
-        let links = self
-            .links
-            .iter()
-            .map(|(id, link)| (id.0, link.lhs.1 .0, link.rhs.1 .0, LinkArgs::default()));
+        let links = self.links.iter().map(|(id, link)| {
+            (id.0, link.lhs.1 .0, link.rhs.1 .0, LinkArgs::default())
+        });
 
         self.node_ctx.show(nodes, links, ui);
 
@@ -197,6 +208,22 @@ impl UiContext {
 
         self.nodes.insert(inst.id, inst);
     }
+
+    fn update_theme(&mut self, theme: &'static Theme) {
+        self.theme = theme;
+        self.node_ctx.style.colors[ColorStyle::Pin as usize] = theme.link;
+        self.node_ctx.style.colors[ColorStyle::PinHovered as usize] = theme.link_hovered;
+        self.node_ctx.style.colors[ColorStyle::Link as usize] = theme.link;
+        self.node_ctx.style.colors[ColorStyle::LinkHovered as usize] = theme.link_hovered;
+        self.node_ctx.style.colors[ColorStyle::LinkSelected as usize] = theme.link_hovered;
+        self.node_ctx.style.colors[ColorStyle::TitleBar as usize] = theme.titlebar;
+        self.node_ctx.style.colors[ColorStyle::TitleBarHovered as usize] = theme.titlebar_hovered;
+        self.node_ctx.style.colors[ColorStyle::TitleBarSelected as usize] = theme.titlebar_hovered;
+        self.node_ctx.style.colors[ColorStyle::NodeBackground as usize] = theme.node_background;
+        self.node_ctx.style.colors[ColorStyle::NodeBackgroundHovered as usize] = theme.node_background_hovered;
+        self.node_ctx.style.colors[ColorStyle::NodeBackgroundSelected as usize] = theme.node_background_hovered;
+        self.node_ctx.style.colors[ColorStyle::GridBackground as usize] = theme.grid_background;
+    }
 }
 
 impl eframe::epi::App for UiContext {
@@ -205,6 +232,21 @@ impl eframe::epi::App for UiContext {
     }
 
     fn update(&mut self, ctx: &egui::CtxRef, frame: &eframe::epi::Frame) {
+        let mut visuals = if self.theme.dark {
+            Visuals::dark()
+        } else {
+            Visuals::light()
+        };
+
+        visuals.window_corner_radius = 3.0;
+        visuals.override_text_color = Some(self.theme.text);
+        visuals.widgets.active.bg_fill = self.theme.node_background;
+        visuals.widgets.hovered.bg_fill = self.theme.node_background_hovered;
+        visuals.widgets.open.bg_fill = self.theme.grid_background;
+        visuals.widgets.inactive.bg_fill = self.theme.grid_background;
+
+        ctx.set_visuals(visuals);
+
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 egui::menu::menu_button(ui, "Effects", |ui| {
@@ -215,6 +257,14 @@ impl eframe::epi::App for UiContext {
                         }
                     }
                 });
+
+                egui::menu::menu_button(ui, "Theme", |ui| {
+                    for (name, theme) in theme::THEMES {
+                        if ui.button(*name).clicked() {
+                            self.update_theme(theme);
+                        }
+                    }
+                })
             });
         });
 
