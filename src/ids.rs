@@ -20,6 +20,10 @@ pub struct PortId(pub usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LinkId(pub usize);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DeviceId(pub usize);
+
 impl_id_gen!(NodeId);
 impl_id_gen!(PortId);
 impl_id_gen!(LinkId);
+impl_id_gen!(DeviceId);

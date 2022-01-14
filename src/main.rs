@@ -45,7 +45,8 @@ fn install_tracing() -> color_eyre::Result<()> {
 
     let fmt_layer = tracing_subscriber::fmt::layer().with_span_events(FmtSpan::CLOSE);
     // .pretty();
-    let filter_layer = tracing_subscriber::EnvFilter::from_default_env();
+    let filter_layer =
+        tracing_subscriber::EnvFilter::from_default_env().add_directive("dsp_stuff=info".parse()?);
 
     tracing_subscriber::registry()
         .with(tracing_error::ErrorLayer::default())

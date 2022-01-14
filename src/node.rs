@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, any::Any};
+use std::{collections::HashMap, sync::Arc};
 
 use arc_swap::ArcSwap;
 use rivulet::{
@@ -6,7 +6,7 @@ use rivulet::{
     splittable, View, ViewMut,
 };
 
-use crate::ids::PortId;
+use crate::ids::{PortId, NodeId};
 
 pub type NodeInputs<'a, 'b, 'c> =
     &'a mut HashMap<PortId, &'b mut [&'c mut splittable::View<Source<f32>>]>;
@@ -47,7 +47,7 @@ pub trait Node: Send + Sync {
 
     fn render(&self, ui: &mut egui::Ui) -> egui::Response;
 
-    fn new() -> (Self, Box<dyn Any>)
+    fn new(id: NodeId) -> Self
     where
         Self: Sized;
 }

@@ -1,10 +1,11 @@
-use std::{collections::HashMap, sync::Arc, any::Any};
+use std::{collections::HashMap, sync::Arc};
 
-use crate::{ids::PortId, node::*};
+use crate::{ids::{PortId, NodeId}, node::*};
 use atomic_float::AtomicF32;
 use collect_slice::CollectSlice;
 
 pub struct Distort {
+    id: NodeId,
     inputs: PortStorage,
     outputs: PortStorage,
     level: AtomicF32,
@@ -37,18 +38,23 @@ impl Node for Distort {
         r
     }
 
-    fn new() -> (Self, Box<dyn Any>) {
+    fn new(id: NodeId) -> Self {
         let this = Self {
+            id,
             inputs: PortStorage::default(),
             outputs: PortStorage::default(),
-            level: AtomicF32::new(1.0),
+            level: AtomicF32::new(0.0),
         };
 
-        (this, Box::new(()))
+        this
     }
 }
 
 fn do_distort(sample: f32, level: f32) -> f32 {
+    if level < 0.001 {
+        return sample;
+    }
+
     let sample = sample * level;
     let sample = if sample > 1.0 {
         2.0 / 3.0

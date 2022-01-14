@@ -1,13 +1,14 @@
-use crate::ids::{LinkId, NodeId, PortId};
-use crate::node::{Node, Perform};
-use crate::nodes;
-use egui_nodes::{LinkArgs, NodeArgs, NodeConstructor, PinArgs, PinShape};
+use crate::{
+    ids::{LinkId, NodeId, PortId},
+    node::Perform,
+    nodes,
+};
+use egui_nodes::{LinkArgs, NodeArgs, NodeConstructor, PinArgs};
 use itertools::Itertools;
 use rivulet::{
     circular_buffer::{Sink, Source},
-    splittable, SplittableView, View, ViewMut,
+    splittable, SplittableView,
 };
-use std::any::Any;
 use std::{
     collections::{HashMap, HashSet},
     ops::DerefMut,
@@ -128,11 +129,21 @@ impl UiContext {
                 .with_content(|ui| node.instance.render(ui));
 
             for (&input, &id) in node.instance.inputs().iter() {
-                n = n.with_input_attribute(id.0, PinArgs::default(), move |ui| ui.label(input));
+                n = n.with_input_attribute(id.0, PinArgs::default(), move |ui| {
+                    ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                        ui.label(input)
+                    })
+                    .inner
+                });
             }
 
             for (&output, &id) in node.instance.outputs().iter() {
-                n = n.with_output_attribute(id.0, PinArgs::default(), move |ui| ui.label(output));
+                n = n.with_output_attribute(id.0, PinArgs::default(), move |ui| {
+                    ui.with_layout(egui::Layout::top_down(egui::Align::RIGHT), |ui| {
+                        ui.label(output)
+                    })
+                    .inner
+                });
             }
 
             n
@@ -172,8 +183,8 @@ impl UiContext {
         }
     }
 
-    fn add_node(&mut self, instance: Arc<dyn Perform>, instance_data: Box<dyn Any>) {
-        let inst = NodeInstance::new(instance, instance_data);
+    fn add_node(&mut self, id: NodeId, instance: Arc<dyn Perform>) {
+        let inst = NodeInstance::new(id, instance);
         for (_, port) in inst.instance.inputs().iter() {
             self.inputs.insert((inst.id, *port), HashSet::new());
         }
@@ -197,19 +208,11 @@ impl eframe::epi::App for UiContext {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 egui::menu::menu_button(ui, "Effects", |ui| {
-                    if ui.button("Input").clicked() {
-                        let (instance, instance_data) = nodes::input::Input::new();
-                        self.add_node(Arc::new(instance), instance_data);
-                    }
-
-                    if ui.button("Output").clicked() {
-                        let (instance, instance_data) = nodes::output::Output::new();
-                        self.add_node(Arc::new(instance), instance_data);
-                    }
-
-                    if ui.button("Distort").clicked() {
-                        let (instance, instance_data) = nodes::distort::Distort::new();
-                        self.add_node(Arc::new(instance), instance_data);
+                    for (name, ctor) in nodes::NODES {
+                        if ui.button(*name).clicked() {
+                            let id = NodeId::generate();
+                            self.add_node(id, ctor(id));
+                        }
                     }
                 });
             });
@@ -253,16 +256,14 @@ impl LinkInstance {
 struct NodeInstance {
     id: NodeId,
     instance: Arc<dyn Perform>,
-    instance_data: Box<dyn Any>,
     task: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl NodeInstance {
-    fn new(instance: Arc<dyn Perform>, instance_data: Box<dyn Any>) -> Self {
+    fn new(id: NodeId, instance: Arc<dyn Perform>) -> Self {
         Self {
-            id: NodeId::generate(),
+            id,
             instance,
-            instance_data,
             task: None,
         }
     }
