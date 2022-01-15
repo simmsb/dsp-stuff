@@ -101,15 +101,19 @@ impl Node for Input {
             }
 
             if let Some(dev) = selected_device {
-                let (id, new_source) = devices::invoke(devices::DeviceCommand::OpenInput(
+                if let Some((id, new_source)) = devices::invoke(devices::DeviceCommand::OpenInput(
                     selected_host,
                     dev.clone(),
                 ))
                 .input_opened()
-                .unwrap();
-
-                self.selected_device.store(Arc::new(Some((dev, id))));
-                *source = Some(new_source);
+                .unwrap()
+                {
+                    self.selected_device.store(Arc::new(Some((dev, id))));
+                    *source = Some(new_source);
+                } else {
+                    self.selected_device.store(Arc::new(None));
+                    *source = None;
+                }
             } else {
                 self.selected_device.store(Arc::new(None));
                 *source = None;

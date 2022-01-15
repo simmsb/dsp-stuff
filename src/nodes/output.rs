@@ -101,15 +101,19 @@ impl Node for Output {
             }
 
             if let Some(dev) = selected_device {
-                let (id, new_sink) = devices::invoke(devices::DeviceCommand::OpenOutput(
+                if let Some((id, new_sink)) = devices::invoke(devices::DeviceCommand::OpenOutput(
                     selected_host,
                     dev.clone(),
                 ))
                 .output_opened()
-                .unwrap();
-
-                self.selected_device.store(Arc::new(Some((dev, id))));
-                *sink = Some(new_sink);
+                .unwrap()
+                {
+                    self.selected_device.store(Arc::new(Some((dev, id))));
+                    *sink = Some(new_sink);
+                } else {
+                    self.selected_device.store(Arc::new(None));
+                    *sink = None;
+                }
             } else {
                 self.selected_device.store(Arc::new(None));
                 *sink = None;

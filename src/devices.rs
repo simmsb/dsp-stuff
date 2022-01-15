@@ -60,12 +60,21 @@ lazy_static::lazy_static! {
                                 .find(|d| d.name().ok().as_ref() == Some(&dev))
                                 .unwrap();
 
-                        let (stream, source) = input_stream(device);
-                        stream.play().unwrap();
-                        let id = DeviceId::generate();
-                        devices.insert(id, stream);
+                        let r = match input_stream(device) {
+                            Ok((stream, source)) => {
+                                stream.play().unwrap();
+                                let id = DeviceId::generate();
+                                devices.insert(id, stream);
 
-                        resp_chan.send(DeviceResponse::InputOpened(id, source)).unwrap();
+                                Some((id, source))
+                            },
+                            Err(e) => {
+                                tracing::error!("Opening input failed: {:#}", e);
+                                None
+                            },
+                        };
+
+                        resp_chan.send(DeviceResponse::InputOpened(r)).unwrap();
                     },
                     DeviceCommand::OpenOutput(host, dev) => {
                         tracing::info!("Opening output device {dev:?}");
@@ -79,12 +88,21 @@ lazy_static::lazy_static! {
                                 .find(|d| d.name().ok().as_ref() == Some(&dev))
                                 .unwrap();
 
-                        let (stream, sink) = output_stream(device);
-                        stream.play().unwrap();
-                        let id = DeviceId::generate();
-                        devices.insert(id, stream);
+                        let r = match output_stream(device) {
+                            Ok((stream, sink)) => {
+                                stream.play().unwrap();
+                                let id = DeviceId::generate();
+                                devices.insert(id, stream);
 
-                        resp_chan.send(DeviceResponse::OutputOpened(id, sink)).unwrap();
+                                Some((id, sink))
+                            },
+                            Err(e) => {
+                                tracing::error!("Opening output failed: {:#}", e);
+                                None
+                            },
+                        };
+
+                        resp_chan.send(DeviceResponse::OutputOpened(r)).unwrap();
                     },
                     DeviceCommand::CloseDevice(dev) => {
                         tracing::info!("Closing device {dev:?}");
@@ -121,8 +139,8 @@ pub enum DeviceCommand {
 pub enum DeviceResponse {
     Hosts(Vec<cpal::HostId>),
     Devices(Vec<String>),
-    InputOpened(DeviceId, splittable::View<Source<f32>>),
-    OutputOpened(DeviceId, Sink<f32>),
+    InputOpened(Option<(DeviceId, splittable::View<Source<f32>>)>),
+    OutputOpened(Option<(DeviceId, Sink<f32>)>),
     DeviceClosed,
 }
 
@@ -141,16 +159,16 @@ impl DeviceResponse {
         }
     }
 
-    pub fn input_opened(self) -> Option<(DeviceId, splittable::View<Source<f32>>)> {
+    pub fn input_opened(self) -> Option<Option<(DeviceId, splittable::View<Source<f32>>)>> {
         match self {
-            Self::InputOpened(x, y) => Some((x, y)),
+            Self::InputOpened(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn output_opened(self) -> Option<(DeviceId, Sink<f32>)> {
+    pub fn output_opened(self) -> Option<Option<(DeviceId, Sink<f32>)>> {
         match self {
-            Self::OutputOpened(x, y) => Some((x, y)),
+            Self::OutputOpened(v) => Some(v),
             _ => None,
         }
     }
@@ -164,8 +182,10 @@ impl DeviceResponse {
     }
 }
 
-fn input_stream(dev: cpal::Device) -> (cpal::Stream, splittable::View<Source<f32>>) {
-    let cfg = dev.default_input_config().unwrap();
+fn input_stream(
+    dev: cpal::Device,
+) -> color_eyre::Result<(cpal::Stream, splittable::View<Source<f32>>)> {
+    let cfg = dev.default_input_config()?;
     println!("{:#?}, {:#?}", cfg, cfg.config());
 
     let lowest_buf_size = match cfg.buffer_size() {
@@ -189,30 +209,28 @@ fn input_stream(dev: cpal::Device) -> (cpal::Stream, splittable::View<Source<f32
 
     // TODO: sample type conversion
 
-    let stream = dev
-        .build_input_stream(
-            &cfg_v,
-            move |data: &[f32], _| {
-                if sink.try_grant(data.len()).unwrap() {
-                    let buf = sink.view_mut();
-                    buf[..data.len()].copy_from_slice(data);
-                    sink.release(data.len());
-                } else {
-                    // println!("input fuck");
-                    // input will fall behind
-                };
-            },
-            move |err| {
-                eprintln!("input oops: {:#?}", err);
-            },
-        )
-        .unwrap();
+    let stream = dev.build_input_stream(
+        &cfg_v,
+        move |data: &[f32], _| {
+            if sink.try_grant(data.len()).unwrap() {
+                let buf = sink.view_mut();
+                buf[..data.len()].copy_from_slice(data);
+                sink.release(data.len());
+            } else {
+                // println!("input fuck");
+                // input will fall behind
+            };
+        },
+        move |err| {
+            eprintln!("input oops: {:#?}", err);
+        },
+    )?;
 
-    (stream, source.into_view())
+    Ok((stream, source.into_view()))
 }
 
-fn output_stream(dev: cpal::Device) -> (cpal::Stream, Sink<f32>) {
-    let cfg = dev.default_output_config().unwrap();
+fn output_stream(dev: cpal::Device) -> color_eyre::Result<(cpal::Stream, Sink<f32>)> {
+    let cfg = dev.default_output_config()?;
     println!("{:#?}, {:#?}", cfg, cfg.config());
 
     let lowest_buf_size = match cfg.buffer_size() {
@@ -235,24 +253,22 @@ fn output_stream(dev: cpal::Device) -> (cpal::Stream, Sink<f32>) {
     let (sink, source) = rivulet::circular_buffer::<f32>(lowest_buf_size as usize * 8);
     let mut source = source.into_view();
 
-    let stream = dev
-        .build_output_stream(
-            &cfg_v,
-            move |data: &mut [f32], _| {
-                if source.try_grant(data.len()).unwrap() {
-                    let buf = source.view();
-                    data.copy_from_slice(&buf[..data.len()]);
-                    source.release(data.len());
-                } else {
-                    // println!("output fuck");
-                    // oops
-                };
-            },
-            move |err| {
-                eprintln!("output oops: {:#?}", err);
-            },
-        )
-        .unwrap();
+    let stream = dev.build_output_stream(
+        &cfg_v,
+        move |data: &mut [f32], _| {
+            if source.try_grant(data.len()).unwrap() {
+                let buf = source.view();
+                data.copy_from_slice(&buf[..data.len()]);
+                source.release(data.len());
+            } else {
+                // println!("output fuck");
+                // oops
+            };
+        },
+        move |err| {
+            eprintln!("output oops: {:#?}", err);
+        },
+    )?;
 
-    (stream, sink)
+    Ok((stream, sink))
 }

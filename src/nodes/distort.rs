@@ -39,7 +39,7 @@ impl Node for Distort {
 
             let mut s = self.level.load(std::sync::atomic::Ordering::Relaxed);
 
-            let r = ui.add(egui::Slider::new(&mut s, 0.0..=100.0));
+            let r = ui.add(egui::Slider::new(&mut s, 0.0..=50.0));
 
             if r.changed() {
                 self.level.store(s, std::sync::atomic::Ordering::Relaxed);

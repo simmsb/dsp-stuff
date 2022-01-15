@@ -67,7 +67,7 @@ impl Node for WaveView {
                 })
                 .collect::<Vec<_>>();
 
-            let thickness = 2.0;
+            let thickness = 1.3;
 
             let line = Shape::line(
                 points,

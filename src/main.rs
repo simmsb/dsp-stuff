@@ -41,7 +41,7 @@ fn install_tracing() -> color_eyre::Result<()> {
     Ok(())
 }
 
-fn main() -> color_eyre::eyre::Result<()> {
+fn main() -> color_eyre::Result<()> {
     install_tracing()?;
 
     color_eyre::install()?;
