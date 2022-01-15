@@ -155,6 +155,7 @@ impl DeviceResponse {
         }
     }
 
+    #[allow(unused)]
     pub fn device_closed(self) -> Option<()> {
         match self {
             Self::DeviceClosed => Some(()),

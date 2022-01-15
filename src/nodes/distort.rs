@@ -5,7 +5,7 @@ use atomic_float::AtomicF32;
 use collect_slice::CollectSlice;
 
 pub struct Distort {
-    id: NodeId,
+    _id: NodeId,
     inputs: PortStorage,
     outputs: PortStorage,
     level: AtomicF32,
@@ -40,7 +40,7 @@ impl Node for Distort {
 
     fn new(id: NodeId) -> Self {
         let this = Self {
-            id,
+            _id: id,
             inputs: PortStorage::default(),
             outputs: PortStorage::default(),
             level: AtomicF32::new(0.0),
