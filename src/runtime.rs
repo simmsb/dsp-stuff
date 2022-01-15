@@ -41,7 +41,7 @@ impl UiContext {
             .unwrap();
 
         let mut node_ctx = egui_nodes::Context::default();
-        // node_ctx.attribute_flag_push(AttributeFlags::EnableLinkDetachWithDragClick);
+        node_ctx.attribute_flag_push(AttributeFlags::EnableLinkDetachWithDragClick);
 
         let mut this = Self {
             runtime,
@@ -59,10 +59,11 @@ impl UiContext {
     }
 
     fn add_link(&mut self, lhs: (NodeId, PortId), rhs: (NodeId, PortId)) {
-        tracing::debug!(?lhs, ?rhs, "Adding link");
-
         let inst = LinkInstance::new(lhs, rhs);
         let id = inst.id;
+
+        tracing::debug!(link = ?inst, "Adding link");
+
 
         self.links.insert(id, inst);
         self.outputs.entry(lhs).or_default().insert(id);
@@ -164,12 +165,15 @@ impl UiContext {
         let links = self
             .links
             .iter()
-            .map(|(id, link)| (id.0, link.lhs.1 .0, link.rhs.1 .0, LinkArgs::default()));
+            .map(|(id, link)| (id.0, link.lhs.1 .0, link.rhs.1 .0, LinkArgs::default()))
+            .collect::<Vec<_>>();
+
+        let link_idxs = links.iter().map(|(id, _, _, _)| *id).collect::<Vec<_>>();
 
         self.node_ctx.show(nodes, links, ui);
 
-        if let Some(id) = self.node_ctx.link_destroyed() {
-            let id = LinkId(id);
+        if let Some(idx) = self.node_ctx.link_destroyed() {
+            let id = LinkId(link_idxs[idx]);
 
             if let Some(inst) = self.links.remove(&id) {
                 self.outputs.get_mut(&inst.lhs).unwrap().remove(&id);
@@ -395,7 +399,7 @@ impl NodeInstance {
                 .map(|(id, x)| (*id, x.as_mut_slice()))
                 .collect::<HashMap<_, _>>();
 
-            tracing::debug!(?id, "Started node, beginning to loop");
+            // tracing::debug!(?id, "Started node, beginning to loop");
             loop {
                 // tracing::debug!(?id, "Performing node");
 
@@ -420,7 +424,7 @@ impl NodeInstance {
         inputs: HashMap<PortId, Vec<Arc<Mutex<splittable::View<Source<f32>>>>>>,
         outputs: HashMap<PortId, Vec<Arc<Mutex<Sink<f32>>>>>,
     ) {
-        tracing::debug!(id = ?self.id, "Restarting node");
+        // tracing::debug!(id = ?self.id, "Restarting node");
         self.stop();
         self.start(inputs, outputs)
     }
