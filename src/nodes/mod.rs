@@ -9,10 +9,12 @@ pub mod distort;
 pub mod input;
 pub mod output;
 pub mod reverb;
+pub mod wave_view;
 
 pub static NODES: &[(&str, fn(NodeId) -> Arc<dyn Perform>)] = &[
     ("Input", |id| Arc::new(input::Input::new(id))),
     ("Output", |id| Arc::new(output::Output::new(id))),
     ("Distort", |id| Arc::new(distort::Distort::new(id))),
     ("Reverb", |id| Arc::new(reverb::Reverb::new(id))),
+    ("Wave view", |id| Arc::new(wave_view::WaveView::new(id))),
 ];

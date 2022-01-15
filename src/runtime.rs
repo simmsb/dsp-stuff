@@ -41,7 +41,7 @@ impl UiContext {
             .unwrap();
 
         let mut node_ctx = egui_nodes::Context::default();
-        node_ctx.attribute_flag_push(AttributeFlags::EnableLinkDetachWithDragClick);
+        // node_ctx.attribute_flag_push(AttributeFlags::EnableLinkDetachWithDragClick);
 
         let mut this = Self {
             runtime,

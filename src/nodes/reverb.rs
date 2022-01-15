@@ -122,7 +122,7 @@ impl SimpleNode for Reverb {
 
             guard.0.release(input.len());
         } else {
-            tracing::info!("not doing it in");
+            tracing::trace!("Reverb buffer is empty");
             output.copy_from_slice(input);
         }
 
@@ -136,7 +136,7 @@ impl SimpleNode for Reverb {
             //     *v = (*v + 0.5).cos();
             // }
         } else {
-            tracing::info!("Not doing it out");
+            tracing::trace!("Not copying frame into reverb buffer");
         }
     }
 }
