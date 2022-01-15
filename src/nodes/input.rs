@@ -34,6 +34,10 @@ impl Node for Input {
         "Input"
     }
 
+    fn id(&self) -> NodeId {
+        self.id
+    }
+
     fn inputs(&self) -> Arc<HashMap<&'static str, PortId>> {
         Arc::clone(&self.inputs)
     }

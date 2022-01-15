@@ -5,7 +5,7 @@ use crate::{
     theme::{self, Theme},
 };
 use egui::Visuals;
-use egui_nodes::{LinkArgs, NodeArgs, NodeConstructor, PinArgs, AttributeFlags, ColorStyle};
+use egui_nodes::{AttributeFlags, ColorStyle, LinkArgs, NodeArgs, NodeConstructor, PinArgs};
 use itertools::Itertools;
 use rivulet::{
     circular_buffer::{Sink, Source},
@@ -161,21 +161,25 @@ impl UiContext {
             n
         });
 
-        let links = self.links.iter().map(|(id, link)| {
-            (id.0, link.lhs.1 .0, link.rhs.1 .0, LinkArgs::default())
-        });
+        let links = self
+            .links
+            .iter()
+            .map(|(id, link)| (id.0, link.lhs.1 .0, link.rhs.1 .0, LinkArgs::default()));
 
         self.node_ctx.show(nodes, links, ui);
 
         if let Some(id) = self.node_ctx.link_destroyed() {
             let id = LinkId(id);
 
-            let inst = self.links.remove(&id).unwrap();
+            if let Some(inst) = self.links.remove(&id) {
+                self.outputs.get_mut(&inst.lhs).unwrap().remove(&id);
+                self.inputs.get_mut(&inst.rhs).unwrap().remove(&id);
 
-            self.outputs.get_mut(&inst.lhs).unwrap().remove(&id);
-            self.inputs.get_mut(&inst.rhs).unwrap().remove(&id);
-
-            self.update_links(inst.lhs, inst.rhs);
+                self.update_links(inst.lhs, inst.rhs);
+                tracing::debug!(link = ?inst, "Removing link");
+            } else {
+                tracing::warn!("GUI told us to remove link {:?} which isn't tracked", id);
+            }
         }
 
         if let Some((start_port, start_node, end_port, end_node, _)) =
@@ -189,7 +193,7 @@ impl UiContext {
             } else if self.inputs.contains_key(&end) && self.outputs.contains_key(&start) {
                 self.add_link(start, end);
             } else {
-                println!("attempt to create out-out or in-in link");
+                tracing::debug!("Attempt to create out-out or in-in link between {:?}, {:?}", start, end);
             };
         }
     }
@@ -220,8 +224,10 @@ impl UiContext {
         self.node_ctx.style.colors[ColorStyle::TitleBarHovered as usize] = theme.titlebar_hovered;
         self.node_ctx.style.colors[ColorStyle::TitleBarSelected as usize] = theme.titlebar_hovered;
         self.node_ctx.style.colors[ColorStyle::NodeBackground as usize] = theme.node_background;
-        self.node_ctx.style.colors[ColorStyle::NodeBackgroundHovered as usize] = theme.node_background_hovered;
-        self.node_ctx.style.colors[ColorStyle::NodeBackgroundSelected as usize] = theme.node_background_hovered;
+        self.node_ctx.style.colors[ColorStyle::NodeBackgroundHovered as usize] =
+            theme.node_background_hovered;
+        self.node_ctx.style.colors[ColorStyle::NodeBackgroundSelected as usize] =
+            theme.node_background_hovered;
         self.node_ctx.style.colors[ColorStyle::GridBackground as usize] = theme.grid_background;
     }
 }
@@ -276,13 +282,17 @@ impl eframe::epi::App for UiContext {
     }
 }
 
+#[derive(derivative::Derivative)]
+#[derivative(Debug)]
 struct LinkInstance {
     id: LinkId,
 
     lhs: (NodeId, PortId),
+    #[derivative(Debug = "ignore")]
     sink: Arc<Mutex<Sink<f32>>>,
 
     rhs: (NodeId, PortId),
+    #[derivative(Debug = "ignore")]
     source: Arc<Mutex<splittable::View<Source<f32>>>>,
 }
 

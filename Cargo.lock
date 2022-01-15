@@ -742,6 +742,7 @@ dependencies = [
  "color-eyre",
  "console-subscriber",
  "cpal",
+ "derivative",
  "eframe",
  "egui",
  "egui_nodes",

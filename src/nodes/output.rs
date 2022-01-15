@@ -34,6 +34,10 @@ impl Node for Output {
         "Output"
     }
 
+    fn id(&self) -> NodeId {
+        self.id
+    }
+
     fn inputs(&self) -> Arc<HashMap<&'static str, PortId>> {
         self.inputs.get_or_create("in");
         self.inputs.all()

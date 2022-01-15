@@ -39,6 +39,8 @@ impl PortStorage {
 pub trait Node: Send + Sync {
     fn title(&self) -> &'static str;
 
+    fn id(&self) -> NodeId;
+
     /// The ids and names of the input nodes
     fn inputs(&self) -> Arc<HashMap<&'static str, PortId>>;
 
@@ -114,11 +116,11 @@ impl<T: SimpleNode> Perform for T {
             .map(|(k, v)| (*k, &mut v[..buf_size]))
             .collect::<HashMap<_, _>>();
 
-        for output in outputs.values_mut() {
+
+        for (k, output) in outputs.iter_mut() {
+            tracing::trace!(name = self.title(), id = ?self.id(), "Waiting for {} outputs on port {:?}", output.len(), k);
             for out in output.iter_mut() {
-                tracing::debug!("waiting for output grant");
                 out.grant(buf_size).await.unwrap();
-                tracing::debug!("got output grant");
             }
         }
 
@@ -126,7 +128,7 @@ impl<T: SimpleNode> Perform for T {
 
         let mut collected_inputs: HashMap<PortId, Vec<f32>> = HashMap::with_capacity(inputs.len());
         for (k, input) in inputs.iter_mut() {
-            tracing::debug!("collecting {} inputs for port {:?}", input.len(), k);
+            tracing::trace!(name = self.title(), id = ?self.id(), "collecting {} inputs for port {:?}", input.len(), k);
 
             collected_inputs.insert(*k, collect_and_average(buf_size, input).await);
         }

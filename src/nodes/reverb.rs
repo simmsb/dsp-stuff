@@ -13,7 +13,7 @@ use rivulet::{
 use std::sync::Mutex;
 
 pub struct Reverb {
-    _id: NodeId,
+    id: NodeId,
     inputs: PortStorage,
     outputs: PortStorage,
     seconds: AtomicF32,
@@ -24,6 +24,10 @@ pub struct Reverb {
 impl Node for Reverb {
     fn title(&self) -> &'static str {
         "Reverb"
+    }
+
+    fn id(&self) -> NodeId {
+        self.id
     }
 
     fn inputs(&self) -> Arc<HashMap<&'static str, PortId>> {
@@ -84,7 +88,7 @@ impl Node for Reverb {
         sink.release(sink.view().len());
 
         let this = Self {
-            _id: id,
+            id,
             inputs: PortStorage::default(),
             outputs: PortStorage::default(),
             seconds: AtomicF32::new(0.0),

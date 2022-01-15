@@ -1,11 +1,14 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{ids::{PortId, NodeId}, node::*};
+use crate::{
+    ids::{NodeId, PortId},
+    node::*,
+};
 use atomic_float::AtomicF32;
 use collect_slice::CollectSlice;
 
 pub struct Distort {
-    _id: NodeId,
+    id: NodeId,
     inputs: PortStorage,
     outputs: PortStorage,
     level: AtomicF32,
@@ -14,6 +17,10 @@ pub struct Distort {
 impl Node for Distort {
     fn title(&self) -> &'static str {
         "Distort"
+    }
+
+    fn id(&self) -> NodeId {
+        self.id
     }
 
     fn inputs(&self) -> Arc<HashMap<&'static str, PortId>> {
@@ -27,20 +34,26 @@ impl Node for Distort {
     }
 
     fn render(&self, ui: &mut egui::Ui) -> egui::Response {
-        let mut s = self.level.load(std::sync::atomic::Ordering::Relaxed);
+        let r = ui.horizontal(|ui| {
+            ui.label("Level");
 
-        let r = ui.add(egui::Slider::new(&mut s, 0.0..=100.0));
+            let mut s = self.level.load(std::sync::atomic::Ordering::Relaxed);
 
-        if r.changed() {
-            self.level.store(s, std::sync::atomic::Ordering::Relaxed);
-        }
+            let r = ui.add(egui::Slider::new(&mut s, 0.0..=100.0));
 
-        r
+            if r.changed() {
+                self.level.store(s, std::sync::atomic::Ordering::Relaxed);
+            }
+
+            r
+        });
+
+        r.response
     }
 
     fn new(id: NodeId) -> Self {
         let this = Self {
-            _id: id,
+            id,
             inputs: PortStorage::default(),
             outputs: PortStorage::default(),
             level: AtomicF32::new(0.0),
@@ -73,8 +86,6 @@ impl SimpleNode for Distort {
 
         let input_id = self.inputs.get("in").unwrap();
         let output_id = self.outputs.get("out").unwrap();
-
-        tracing::debug!(level, "Doing a distort");
 
         inputs
             .get(&input_id)
