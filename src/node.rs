@@ -93,8 +93,16 @@ pub async fn collect_and_average(
 ) -> Vec<f32> {
     let mut out = vec![0.0; buf_size];
 
+    let mut num_frames = 0.0001;
+
     for in_ in input.iter_mut() {
         in_.grant(buf_size).await.unwrap();
+        if in_.view().len() < buf_size {
+            continue;
+        }
+
+        num_frames += 1.0;
+
         for (a, b) in out.iter_mut().zip(in_.view()[..buf_size].iter()) {
             *a += b;
         }
@@ -104,7 +112,7 @@ pub async fn collect_and_average(
     // as an atomic operation
 
     for v in out.iter_mut() {
-        *v /= input.len() as f32;
+        *v /= num_frames;
     }
 
     out
@@ -164,7 +172,9 @@ impl<T: SimpleNode> Perform for T {
 
         for input in inputs.values_mut() {
             for in_ in input.iter_mut() {
-                in_.release(buf_size);
+                // if the view is less than the buf size, then we didn't actually read from it
+                // but skip it anyway
+                in_.release(buf_size.min(in_.view().len()));
             }
         }
 

@@ -234,32 +234,26 @@ impl UiContext {
 
         let links = self
             .links
-            .iter()
-            .map(|(id, link)| {
-                (
-                    id.get(),
-                    link.lhs.1.get(),
-                    link.rhs.1.get(),
-                    LinkArgs::default(),
-                )
-            })
+            .values()
+            .enumerate()
+            .map(|(idx, link)| (idx, link.lhs.1.get(), link.rhs.1.get(), LinkArgs::default()))
             .collect::<Vec<_>>();
-
-        let link_idxs = links.iter().map(|(id, _, _, _)| *id).collect::<Vec<_>>();
 
         self.node_ctx.show(nodes, links, ui);
 
         if let Some(idx) = self.node_ctx.link_destroyed() {
-            let id = LinkId::new(link_idxs[idx]);
+            if let Some(&id) = self.links.keys().nth(idx) {
+                if let Some(inst) = self.links.remove(&id) {
+                    tracing::debug!(link = ?inst, "Removing link");
+                    self.outputs.get_mut(&inst.lhs).unwrap().remove(&id);
+                    self.inputs.get_mut(&inst.rhs).unwrap().remove(&id);
 
-            if let Some(inst) = self.links.remove(&id) {
-                self.outputs.get_mut(&inst.lhs).unwrap().remove(&id);
-                self.inputs.get_mut(&inst.rhs).unwrap().remove(&id);
-
-                self.update_links(inst.lhs, inst.rhs);
-                tracing::debug!(link = ?inst, "Removing link");
+                    self.update_links(inst.lhs, inst.rhs);
+                } else {
+                    tracing::warn!("GUI told us to remove link {:?} which isn't tracked", id);
+                }
             } else {
-                tracing::warn!("GUI told us to remove link {:?} which isn't tracked", id);
+                tracing::warn!(links = ?self.links, "GUI told us to remove link idx {} which isn't known", idx);
             }
         }
 
@@ -446,7 +440,10 @@ struct NodeInstance {
     id: NodeId,
     instance: Arc<dyn Perform>,
     position: egui::Pos2,
-    task: Option<tokio::task::JoinHandle<()>>,
+    task: Option<(
+        tokio::task::JoinHandle<()>,
+        tokio::sync::oneshot::Sender<()>,
+    )>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -496,9 +493,24 @@ impl NodeInstance {
     ) {
         assert!(self.task.is_none());
         let id = self.id;
-        tracing::debug!(?id, "Starting node");
 
         let instance = Arc::clone(&self.instance);
+
+        let num_inputs: usize = inputs.values().map(|v| v.len()).sum();
+        let num_outputs: usize = outputs.values().map(|v| v.len()).sum();
+
+        tracing::debug!(?id, num_inputs, num_outputs, "Starting node");
+
+        if num_inputs == 0 && num_outputs == 0 {
+            tracing::debug!(
+                ?id,
+                "Abandoning node startup, it has no inputs and no outputs"
+            );
+            // if the node has no inputs or outputs, do nothing
+            return;
+        }
+
+        let (cancel_in, mut cancel_out) = tokio::sync::oneshot::channel();
 
         let coro = async move {
             // this is horrible
@@ -556,23 +568,25 @@ impl NodeInstance {
                 .map(|(id, x)| (*id, x.as_mut_slice()))
                 .collect::<HashMap<_, _>>();
 
-            // tracing::debug!(?id, "Started node, beginning to loop");
             loop {
-                // tracing::debug!(?id, "Performing node");
+                let mut perform = instance.perform(&mut input_slices, &mut output_slices);
 
-                instance
-                    .perform(&mut input_slices, &mut output_slices)
-                    .await
+                tokio::select! {
+                    _ = &mut cancel_out => {
+                        return;
+                    },
+                    _ = &mut perform => {}
+                }
             }
         };
 
-        self.task = Some(tokio::spawn(coro));
+        self.task = Some((tokio::spawn(coro), cancel_in));
     }
 
     fn stop(&mut self) {
         tracing::debug!(id = ?self.id, "Stopping node");
-        if let Some(handle) = self.task.take() {
-            handle.abort();
+        if let Some((_, stop)) = self.task.take() {
+            let _ = stop.send(());
         }
     }
 
