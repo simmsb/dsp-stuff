@@ -257,6 +257,9 @@ fn output_stream(dev: cpal::Device) -> color_eyre::Result<(cpal::Stream, Sink<f3
         &cfg_v,
         move |data: &mut [f32], _| {
             if source.try_grant(data.len()).unwrap() {
+                // TODO: investigate if we can skip/ compress as much data as is
+                // available so that latency from buffers up the chain being
+                // full can be trimmed
                 let buf = source.view();
                 data.copy_from_slice(&buf[..data.len()]);
                 source.release(data.len());
