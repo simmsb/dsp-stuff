@@ -6,32 +6,34 @@ use rivulet::{
     splittable, View, ViewMut,
 };
 
-use crate::ids::{PortId, NodeId};
+use crate::ids::{NodeId, PortId};
 
 pub type NodeInputs<'a, 'b, 'c> =
     &'a mut HashMap<PortId, &'b mut [&'c mut splittable::View<Source<f32>>]>;
 pub type NodeOutputs<'a, 'b, 'c> = &'a mut HashMap<PortId, &'b mut [&'c mut Sink<f32>]>;
 
 #[derive(Debug, Default)]
-pub struct PortStorage(ArcSwap<HashMap<&'static str, PortId>>);
+pub struct PortStorage(ArcSwap<HashMap<String, PortId>>);
 
 impl PortStorage {
-    pub fn get_or_create(&self, name: &'static str) -> (PortId, &'static str) {
+    pub fn new(inner: HashMap<String, PortId>) -> Self {
+        PortStorage(ArcSwap::new(Arc::new(inner)))
+    }
+
+    pub fn ensure_name(&self, name: &str) {
         self.0.rcu(|x| {
             let mut map = HashMap::new();
             map.clone_from(x);
-            map.entry(name).or_insert_with(PortId::generate);
+            map.entry(name.to_owned()).or_insert_with(PortId::generate);
             map
         });
-
-        (*self.0.load().get(name).unwrap(), name)
     }
 
-    pub fn get(&self, name: &'static str) -> Option<PortId> {
+    pub fn get(&self, name: &str) -> Option<PortId> {
         self.0.load().get(name).cloned()
     }
 
-    pub fn all(&self) -> Arc<HashMap<&'static str, PortId>> {
+    pub fn all(&self) -> Arc<HashMap<String, PortId>> {
         self.0.load_full()
     }
 }
@@ -39,17 +41,25 @@ impl PortStorage {
 pub trait Node: Send + Sync {
     fn title(&self) -> &'static str;
 
+    fn cfg_name(&self) -> &'static str;
+
     fn id(&self) -> NodeId;
 
     /// The ids and names of the input nodes
-    fn inputs(&self) -> Arc<HashMap<&'static str, PortId>>;
+    fn inputs(&self) -> Arc<HashMap<String, PortId>>;
 
     /// The ids and names of the output nodes
-    fn outputs(&self) -> Arc<HashMap<&'static str, PortId>>;
+    fn outputs(&self) -> Arc<HashMap<String, PortId>>;
 
     fn render(&self, ui: &mut egui::Ui) -> egui::Response;
 
     fn new(id: NodeId) -> Self
+    where
+        Self: Sized;
+
+    fn save(&self) -> serde_json::Value;
+
+    fn restore(value: serde_json::Value) -> Self
     where
         Self: Sized;
 }
@@ -115,7 +125,6 @@ impl<T: SimpleNode> Perform for T {
             .iter_mut()
             .map(|(k, v)| (*k, &mut v[..buf_size]))
             .collect::<HashMap<_, _>>();
-
 
         for (k, output) in outputs.iter_mut() {
             tracing::trace!(name = self.title(), id = ?self.id(), "Waiting for {} outputs on port {:?}", output.len(), k);

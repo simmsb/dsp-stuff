@@ -18,3 +18,21 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<dyn Perform>)] = &[
     ("Reverb", |id| Arc::new(reverb::Reverb::new(id))),
     ("Wave view", |id| Arc::new(wave_view::WaveView::new(id))),
 ];
+
+pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<dyn Perform>)] = &[
+    ("input", |v| {
+        Arc::new(input::Input::restore(v))
+    }),
+    ("output", |v| {
+        Arc::new(output::Output::restore(v))
+    }),
+    ("distort", |v| {
+        Arc::new(distort::Distort::restore(v))
+    }),
+    ("reverb", |v| {
+        Arc::new(reverb::Reverb::restore(v))
+    }),
+    ("wave_view", |v| {
+        Arc::new(wave_view::WaveView::restore(v))
+    }),
+];

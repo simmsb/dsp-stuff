@@ -4,15 +4,17 @@ use crate::{
     nodes,
     theme::{self, Theme},
 };
-use egui::Visuals;
+use egui::{pos2, Visuals};
 use egui_nodes::{AttributeFlags, ColorStyle, LinkArgs, NodeArgs, NodeConstructor, PinArgs};
 use itertools::Itertools;
 use rivulet::{
     circular_buffer::{Sink, Source},
     splittable, SplittableView,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
+    io::Write,
     ops::DerefMut,
     sync::Arc,
 };
@@ -31,6 +33,12 @@ pub struct UiContext {
     outputs: HashMap<(NodeId, PortId), HashSet<LinkId>>,
 
     nodes: HashMap<NodeId, NodeInstance>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct DSPConfig {
+    nodes: Vec<NodeConfig>,
+    links: Vec<LinkConfig>,
 }
 
 impl UiContext {
@@ -58,18 +66,63 @@ impl UiContext {
         this
     }
 
+    fn save_config(&self) -> DSPConfig {
+        let nodes = self.nodes.values().map(|n| n.save()).collect();
+        let links = self.links.values().map(|l| l.save()).collect();
+
+        DSPConfig { nodes, links }
+    }
+
+    fn restore_config(&mut self, cfg: DSPConfig) {
+        for node in self.nodes.values_mut() {
+            node.stop()
+        }
+
+        self.links.clear();
+        self.inputs.clear();
+        self.outputs.clear();
+        self.nodes.clear();
+
+        for node in cfg.nodes {
+            let restored = NodeInstance::restore(node);
+            self.nodes.insert(restored.id, restored);
+        }
+
+        for link in cfg.links {
+            self.add_link(link.lhs, link.rhs);
+        }
+
+        self.update_all();
+    }
+
     fn add_link(&mut self, lhs: (NodeId, PortId), rhs: (NodeId, PortId)) {
-        let inst = LinkInstance::new(lhs, rhs);
-        let id = inst.id;
+        let id = LinkId::generate();
+        let inst = LinkInstance::new(id, lhs, rhs);
 
         tracing::debug!(link = ?inst, "Adding link");
-
 
         self.links.insert(id, inst);
         self.outputs.entry(lhs).or_default().insert(id);
         self.inputs.entry(rhs).or_default().insert(id);
+    }
 
-        self.update_links(lhs, rhs)
+    fn update_all(&mut self) {
+        let _guard = self.runtime.enter();
+
+        let calculated = self
+            .nodes
+            .values()
+            .map(|node| {
+                (
+                    self.compute_inputs_for(node.id),
+                    self.compute_outputs_for(node.id),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        for (node, (inputs, outputs)) in self.nodes.values_mut().zip(calculated) {
+            node.restart(inputs, outputs);
+        }
     }
 
     fn update_links(&mut self, lhs: (NodeId, PortId), rhs: (NodeId, PortId)) {
@@ -136,13 +189,25 @@ impl UiContext {
     }
 
     fn update_nodes(&mut self, ui: &mut egui::Ui) {
-        let nodes = self.nodes.values().map(|node| {
-            let mut n = NodeConstructor::new(node.id.0, NodeArgs::default())
-                .with_title(|ui| ui.label(format!("{} ({:?})", node.instance.title(), node.id)))
-                .with_content(|ui| node.instance.render(ui));
+        for node in self.nodes.values_mut() {
+            if let Some(pos) = self.node_ctx.get_node_pos_screen_space(node.id.get()) {
+                node.position = pos;
+            }
+        }
 
-            for (&input, &id) in node.instance.inputs().iter() {
-                n = n.with_input_attribute(id.0, PinArgs::default(), move |ui| {
+        let nodes = self.nodes.values().map(|node| {
+            let mut n = NodeConstructor::new(node.id.get(), NodeArgs::default())
+                .with_title(|ui| ui.label(format!("{} ({:?})", node.instance.title(), node.id)))
+                .with_content(|ui| node.instance.render(ui))
+                .with_origin(node.position);
+
+            for (input, id) in node
+                .instance
+                .inputs()
+                .iter()
+                .map(|(k, v)| (k.to_owned(), *v))
+            {
+                n = n.with_input_attribute(id.get(), PinArgs::default(), move |ui| {
                     ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
                         ui.label(input)
                     })
@@ -150,8 +215,13 @@ impl UiContext {
                 });
             }
 
-            for (&output, &id) in node.instance.outputs().iter() {
-                n = n.with_output_attribute(id.0, PinArgs::default(), move |ui| {
+            for (output, id) in node
+                .instance
+                .outputs()
+                .iter()
+                .map(|(k, v)| (k.to_owned(), *v))
+            {
+                n = n.with_output_attribute(id.get(), PinArgs::default(), move |ui| {
                     ui.with_layout(egui::Layout::top_down(egui::Align::RIGHT), |ui| {
                         ui.label(output)
                     })
@@ -165,7 +235,14 @@ impl UiContext {
         let links = self
             .links
             .iter()
-            .map(|(id, link)| (id.0, link.lhs.1 .0, link.rhs.1 .0, LinkArgs::default()))
+            .map(|(id, link)| {
+                (
+                    id.get(),
+                    link.lhs.1.get(),
+                    link.rhs.1.get(),
+                    LinkArgs::default(),
+                )
+            })
             .collect::<Vec<_>>();
 
         let link_idxs = links.iter().map(|(id, _, _, _)| *id).collect::<Vec<_>>();
@@ -173,7 +250,7 @@ impl UiContext {
         self.node_ctx.show(nodes, links, ui);
 
         if let Some(idx) = self.node_ctx.link_destroyed() {
-            let id = LinkId(link_idxs[idx]);
+            let id = LinkId::new(link_idxs[idx]);
 
             if let Some(inst) = self.links.remove(&id) {
                 self.outputs.get_mut(&inst.lhs).unwrap().remove(&id);
@@ -189,15 +266,21 @@ impl UiContext {
         if let Some((start_port, start_node, end_port, end_node, _)) =
             self.node_ctx.link_created_node()
         {
-            let start = (NodeId(start_node), PortId(start_port));
-            let end = (NodeId(end_node), PortId(end_port));
+            let start = (NodeId::new(start_node), PortId::new(start_port));
+            let end = (NodeId::new(end_node), PortId::new(end_port));
 
             if self.inputs.contains_key(&start) && self.outputs.contains_key(&end) {
                 self.add_link(end, start);
+                self.update_links(end, start)
             } else if self.inputs.contains_key(&end) && self.outputs.contains_key(&start) {
                 self.add_link(start, end);
+                self.update_links(start, end)
             } else {
-                tracing::debug!("Attempt to create out-out or in-in link between {:?}, {:?}", start, end);
+                tracing::debug!(
+                    "Attempt to create out-out or in-in link between {:?}, {:?}",
+                    start,
+                    end
+                );
             };
         }
     }
@@ -259,6 +342,37 @@ impl eframe::epi::App for UiContext {
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
+                egui::menu::menu_button(ui, "File", |ui| {
+                    if ui.button("Save").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .set_title("Save")
+                            .add_filter("config", &["json"])
+                            .set_file_name("config.json")
+                            .save_file()
+                        {
+                            tracing::info!("Saving to {:?}", path);
+                            if let Ok(mut file) = std::fs::File::create(path) {
+                                let buf = serde_json::to_vec_pretty(&self.save_config()).unwrap();
+                                file.write_all(&buf).unwrap();
+                            }
+                        }
+                    }
+
+                    if ui.button("Load").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .set_title("Load")
+                            .add_filter("config", &["json"])
+                            .pick_file()
+                        {
+                            tracing::info!("Restoring from {:?}", path);
+                            if let Ok(file) = std::fs::File::open(path) {
+                                let cfg: DSPConfig = serde_json::from_reader(file).unwrap();
+                                self.restore_config(cfg);
+                            }
+                        }
+                    }
+                });
+
                 egui::menu::menu_button(ui, "Effects", |ui| {
                     for (name, ctor) in nodes::NODES {
                         if ui.button(*name).clicked() {
@@ -300,10 +414,14 @@ struct LinkInstance {
     source: Arc<Mutex<splittable::View<Source<f32>>>>,
 }
 
-impl LinkInstance {
-    fn new(lhs: (NodeId, PortId), rhs: (NodeId, PortId)) -> Self {
-        let id = LinkId::generate();
+#[derive(Serialize, Deserialize)]
+struct LinkConfig {
+    lhs: (NodeId, PortId),
+    rhs: (NodeId, PortId),
+}
 
+impl LinkInstance {
+    fn new(id: LinkId, lhs: (NodeId, PortId), rhs: (NodeId, PortId)) -> Self {
         let (sink, source) = rivulet::circular_buffer::<f32>(128);
         let source = source.into_view();
 
@@ -315,12 +433,28 @@ impl LinkInstance {
             source: Arc::new(Mutex::new(source)),
         }
     }
+
+    fn save(&self) -> LinkConfig {
+        LinkConfig {
+            lhs: self.lhs,
+            rhs: self.rhs,
+        }
+    }
 }
 
 struct NodeInstance {
     id: NodeId,
     instance: Arc<dyn Perform>,
+    position: egui::Pos2,
     task: Option<tokio::task::JoinHandle<()>>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct NodeConfig {
+    id: NodeId,
+    typename: String,
+    position: (f32, f32),
+    cfg: serde_json::Value,
 }
 
 impl NodeInstance {
@@ -328,8 +462,31 @@ impl NodeInstance {
         Self {
             id,
             instance,
+            position: pos2(100.0, 100.0),
             task: None,
         }
+    }
+
+    fn save(&self) -> NodeConfig {
+        NodeConfig {
+            id: self.id,
+            typename: self.instance.cfg_name().to_owned(),
+            position: self.position.into(),
+            cfg: self.instance.save(),
+        }
+    }
+
+    fn restore(cfg: NodeConfig) -> Self {
+        let (_, restorer) = crate::nodes::RESTORE
+            .iter()
+            .find(|(n, _)| n == &cfg.typename)
+            .unwrap();
+
+        let inst = restorer(cfg.cfg);
+
+        let mut this = Self::new(cfg.id, inst);
+        this.position = egui::Pos2::from(cfg.position);
+        this
     }
 
     fn start(

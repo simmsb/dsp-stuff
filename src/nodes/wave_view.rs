@@ -15,10 +15,16 @@ use rivulet::{
 
 pub struct WaveView {
     id: NodeId,
-    outputs: Arc<HashMap<&'static str, PortId>>,
+    outputs: Arc<HashMap<String, PortId>>,
     inputs: PortStorage,
     view_sink: Arc<Mutex<Sink<f32>>>,
     view_source: Arc<Mutex<splittable::View<Source<f32>>>>,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct WaveViewConfig {
+    id: NodeId,
+    inputs: HashMap<String, PortId>,
 }
 
 impl Node for WaveView {
@@ -26,17 +32,43 @@ impl Node for WaveView {
         "Wave View"
     }
 
+    fn cfg_name(&self) -> &'static str {
+        "wave_view"
+    }
+
     fn id(&self) -> NodeId {
         self.id
     }
 
-    fn inputs(&self) -> Arc<HashMap<&'static str, PortId>> {
-        self.inputs.get_or_create("in");
+    fn inputs(&self) -> Arc<HashMap<String, PortId>> {
+        self.inputs.ensure_name("in");
         self.inputs.all()
     }
 
-    fn outputs(&self) -> Arc<HashMap<&'static str, PortId>> {
+    fn outputs(&self) -> Arc<HashMap<String, PortId>> {
         Arc::clone(&self.outputs)
+    }
+
+    fn save(&self) -> serde_json::Value {
+        let cfg = WaveViewConfig {
+            id: self.id,
+
+            inputs: self.inputs.all().as_ref().clone(),
+        };
+
+        serde_json::to_value(cfg).unwrap()
+    }
+
+    fn restore(value: serde_json::Value) -> Self
+    where
+        Self: Sized,
+    {
+        let cfg: WaveViewConfig = serde_json::from_value(value).unwrap();
+
+        let mut this = Self::new(cfg.id);
+        this.inputs = PortStorage::new(cfg.inputs);
+
+        this
     }
 
     fn render(&self, ui: &mut egui::Ui) -> egui::Response {

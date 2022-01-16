@@ -21,23 +21,86 @@ pub struct Reverb {
     buffer: Arc<Mutex<(splittable::View<Source<f32>>, Sink<f32>)>>,
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
+struct ReverbConfig {
+    id: NodeId,
+    seconds: f32,
+    decay: f32,
+    inputs: HashMap<String, PortId>,
+    outputs: HashMap<String, PortId>,
+}
+
+impl Reverb {
+    fn set_seconds(&self, seconds: f32) {
+        self.seconds
+            .store(seconds, std::sync::atomic::Ordering::Relaxed);
+
+        let num_samples = ((seconds * 48000.0) as usize).max(128);
+
+        let (mut new_sink, new_source) = rivulet::circular_buffer::<f32>(num_samples);
+        let new_source = new_source.into_view();
+
+        let mut guard = self.buffer.lock().unwrap();
+
+        let _ = new_sink.try_grant(num_samples);
+        new_sink.view_mut().fill(0.0);
+        let num_zeros = new_sink.view().len();
+        new_sink.release(num_zeros);
+
+        *guard = (new_source, new_sink);
+    }
+}
+
 impl Node for Reverb {
     fn title(&self) -> &'static str {
         "Reverb"
+    }
+
+    fn cfg_name(&self) -> &'static str {
+        "reverb"
     }
 
     fn id(&self) -> NodeId {
         self.id
     }
 
-    fn inputs(&self) -> Arc<HashMap<&'static str, PortId>> {
-        self.inputs.get_or_create("in");
+    fn inputs(&self) -> Arc<HashMap<String, PortId>> {
+        self.inputs.ensure_name("in");
         self.inputs.all()
     }
 
-    fn outputs(&self) -> Arc<HashMap<&'static str, PortId>> {
-        self.outputs.get_or_create("out");
+    fn outputs(&self) -> Arc<HashMap<String, PortId>> {
+        self.outputs.ensure_name("out");
         self.outputs.all()
+    }
+
+    fn save(&self) -> serde_json::Value {
+        let cfg = ReverbConfig {
+            id: self.id,
+            seconds: self.seconds.load(std::sync::atomic::Ordering::Relaxed),
+            decay: self.decay.load(std::sync::atomic::Ordering::Relaxed),
+            inputs: self.inputs.all().as_ref().clone(),
+            outputs: self.outputs.all().as_ref().clone(),
+        };
+
+        serde_json::to_value(cfg).unwrap()
+    }
+
+    fn restore(value: serde_json::Value) -> Self
+    where
+        Self: Sized,
+    {
+        let cfg: ReverbConfig = serde_json::from_value(value).unwrap();
+
+        let mut this = Self::new(cfg.id);
+
+        this.decay
+            .store(cfg.decay, std::sync::atomic::Ordering::Relaxed);
+        this.set_seconds(cfg.seconds);
+        this.inputs = PortStorage::new(cfg.inputs);
+        this.outputs = PortStorage::new(cfg.outputs);
+
+        this
     }
 
     fn render(&self, ui: &mut egui::Ui) -> egui::Response {
@@ -48,21 +111,7 @@ impl Node for Reverb {
             let r = ui.add(egui::Slider::new(&mut s, 0.0..=10.0));
 
             if r.changed() {
-                self.seconds.store(s, std::sync::atomic::Ordering::Relaxed);
-
-                let num_samples = ((s * 48000.0) as usize).max(128);
-
-                let (mut new_sink, new_source) = rivulet::circular_buffer::<f32>(num_samples);
-                let new_source = new_source.into_view();
-
-                let mut guard = self.buffer.lock().unwrap();
-
-                let _ = new_sink.try_grant(num_samples);
-                new_sink.view_mut().fill(0.0);
-                let num_zeros = new_sink.view().len();
-                new_sink.release(num_zeros);
-
-                *guard = (new_source, new_sink);
+                self.set_seconds(s);
             }
         });
 

@@ -14,22 +14,60 @@ pub struct Distort {
     level: AtomicF32,
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
+struct DistortConfig {
+    id: NodeId,
+    level: f32,
+    inputs: HashMap<String, PortId>,
+    outputs: HashMap<String, PortId>,
+}
+
 impl Node for Distort {
     fn title(&self) -> &'static str {
         "Distort"
+    }
+
+    fn cfg_name(&self) -> &'static str {
+        "distort"
     }
 
     fn id(&self) -> NodeId {
         self.id
     }
 
-    fn inputs(&self) -> Arc<HashMap<&'static str, PortId>> {
-        self.inputs.get_or_create("in");
+    fn save(&self) -> serde_json::Value {
+        let cfg = DistortConfig {
+            id: self.id,
+            level: self.level.load(std::sync::atomic::Ordering::Relaxed),
+            inputs: self.inputs.all().as_ref().clone(),
+            outputs: self.outputs.all().as_ref().clone(),
+        };
+
+        serde_json::to_value(cfg).unwrap()
+    }
+
+    fn restore(value: serde_json::Value) -> Self
+    where
+        Self: Sized {
+
+        let cfg: DistortConfig = serde_json::from_value(value).unwrap();
+
+        let mut this = Self::new(cfg.id);
+
+        this.level.store(cfg.level, std::sync::atomic::Ordering::Relaxed);
+        this.inputs = PortStorage::new(cfg.inputs);
+        this.outputs = PortStorage::new(cfg.outputs);
+
+        this
+    }
+
+    fn inputs(&self) -> Arc<HashMap<String, PortId>> {
+        self.inputs.ensure_name("in");
         self.inputs.all()
     }
 
-    fn outputs(&self) -> Arc<HashMap<&'static str, PortId>> {
-        self.outputs.get_or_create("out");
+    fn outputs(&self) -> Arc<HashMap<String, PortId>> {
+        self.outputs.ensure_name("out");
         self.outputs.all()
     }
 

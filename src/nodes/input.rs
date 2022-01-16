@@ -11,7 +11,7 @@ use tokio::sync::Mutex;
 
 pub struct Input {
     id: NodeId,
-    inputs: Arc<HashMap<&'static str, PortId>>,
+    inputs: Arc<HashMap<String, PortId>>,
     outputs: PortStorage,
     source: Arc<Mutex<Option<splittable::View<Source<f32>>>>>,
 
@@ -29,22 +29,102 @@ impl Drop for Input {
     }
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
+struct InputConfig {
+    id: NodeId,
+    selected_host: String,
+    selected_device: Option<String>,
+    outputs: HashMap<String, PortId>,
+}
+
+impl Input {
+    fn load_device(&self, host: cpal::HostId, name: Option<String>) {
+        let mut source = self.source.blocking_lock();
+
+        let (_current_device, current_device_id) = self
+            .selected_device
+            .load()
+            .as_ref()
+            .clone()
+            .map_or((None, None), |(dev, id)| (Some(dev), Some(id)));
+
+        if let Some(id) = current_device_id {
+            devices::invoke(devices::DeviceCommand::CloseDevice(id));
+        }
+
+        if let Some(dev) = name {
+            if let Some((id, new_source)) =
+                devices::invoke(devices::DeviceCommand::OpenInput(host, dev.clone()))
+                    .input_opened()
+                    .unwrap()
+            {
+                self.selected_device.store(Arc::new(Some((dev, id))));
+                *source = Some(new_source);
+            } else {
+                self.selected_device.store(Arc::new(None));
+                *source = None;
+            }
+        } else {
+            self.selected_device.store(Arc::new(None));
+            *source = None;
+        }
+    }
+}
+
 impl Node for Input {
     fn title(&self) -> &'static str {
         "Input"
+    }
+
+    fn cfg_name(&self) -> &'static str {
+        "input"
     }
 
     fn id(&self) -> NodeId {
         self.id
     }
 
-    fn inputs(&self) -> Arc<HashMap<&'static str, PortId>> {
+    fn inputs(&self) -> Arc<HashMap<String, PortId>> {
         Arc::clone(&self.inputs)
     }
 
-    fn outputs(&self) -> Arc<HashMap<&'static str, PortId>> {
-        self.outputs.get_or_create("out");
+    fn outputs(&self) -> Arc<HashMap<String, PortId>> {
+        self.outputs.ensure_name("out");
         self.outputs.all()
+    }
+
+    fn save(&self) -> serde_json::Value {
+        let cfg = InputConfig {
+            id: self.id,
+            selected_host: self.selected_host.load().name().to_owned(),
+            selected_device: Option::as_ref(&self.selected_device.load())
+                .map(|(n, _)| n.to_owned()),
+            outputs: self.outputs.all().as_ref().clone(),
+        };
+
+        serde_json::to_value(cfg).unwrap()
+    }
+
+    fn restore(value: serde_json::Value) -> Self
+    where
+        Self: Sized,
+    {
+        let cfg: InputConfig = serde_json::from_value(value).unwrap();
+
+        let mut this = Self::new(cfg.id);
+
+        if let Some(host) = devices::invoke(devices::DeviceCommand::ListHosts)
+            .hosts()
+            .unwrap()
+            .into_iter()
+            .find(|x| x.name() == &cfg.selected_host)
+        {
+            this.load_device(host, cfg.selected_device);
+        };
+
+        this.outputs = PortStorage::new(cfg.outputs);
+
+        this
     }
 
     fn render(&self, ui: &mut egui::Ui) -> egui::Response {
@@ -69,7 +149,7 @@ impl Node for Input {
             self.cached_devices.store(Arc::new(devices));
         }
 
-        let (current_device, current_device_id) = self
+        let (current_device, _current_device_id) = self
             .selected_device
             .load()
             .as_ref()
@@ -94,30 +174,7 @@ impl Node for Input {
         });
 
         if current_device != selected_device {
-            let mut source = self.source.blocking_lock();
-
-            if let Some(id) = current_device_id {
-                devices::invoke(devices::DeviceCommand::CloseDevice(id));
-            }
-
-            if let Some(dev) = selected_device {
-                if let Some((id, new_source)) = devices::invoke(devices::DeviceCommand::OpenInput(
-                    selected_host,
-                    dev.clone(),
-                ))
-                .input_opened()
-                .unwrap()
-                {
-                    self.selected_device.store(Arc::new(Some((dev, id))));
-                    *source = Some(new_source);
-                } else {
-                    self.selected_device.store(Arc::new(None));
-                    *source = None;
-                }
-            } else {
-                self.selected_device.store(Arc::new(None));
-                *source = None;
-            }
+            self.load_device(selected_host, selected_device);
         }
 
         r.response
