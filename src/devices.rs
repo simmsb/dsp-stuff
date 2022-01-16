@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use collect_slice::CollectSlice;
+use cpal::{
+    traits::{DeviceTrait, HostTrait, StreamTrait},
+    Sample,
+};
 use rivulet::{
     circular_buffer::{Sink, Source},
     splittable, SplittableView, View, ViewMut,
@@ -182,6 +186,19 @@ impl DeviceResponse {
     }
 }
 
+fn do_read<T: Sample>(data: &[T], sink: &mut Sink<f32>) {
+    if sink.try_grant(data.len()).unwrap() {
+        let buf = sink.view_mut();
+        data.iter()
+            .map(Sample::to_f32)
+            .collect_slice(&mut buf[..data.len()]);
+        sink.release(data.len());
+    } else {
+        // println!("input fuck");
+        // input will fall behind
+    };
+}
+
 fn input_stream(
     dev: cpal::Device,
 ) -> color_eyre::Result<(cpal::Stream, splittable::View<Source<f32>>)> {
@@ -207,26 +224,58 @@ fn input_stream(
 
     let (mut sink, source) = rivulet::circular_buffer::<f32>(lowest_buf_size as usize * 8);
 
-    // TODO: sample type conversion
+    let err_cb = |err| tracing::warn!("output message: {:#?}", err);
 
-    let stream = dev.build_input_stream(
-        &cfg_v,
-        move |data: &[f32], _| {
-            if sink.try_grant(data.len()).unwrap() {
-                let buf = sink.view_mut();
-                buf[..data.len()].copy_from_slice(data);
-                sink.release(data.len());
-            } else {
-                // println!("input fuck");
-                // input will fall behind
-            };
-        },
-        move |err| {
-            eprintln!("input oops: {:#?}", err);
-        },
-    )?;
+    let stream = match cfg.sample_format() {
+        cpal::SampleFormat::I16 => dev.build_input_stream(
+            &cfg_v,
+            move |data: &[i16], _| do_read(data, &mut sink),
+            err_cb,
+        )?,
+        cpal::SampleFormat::U16 => dev.build_input_stream(
+            &cfg_v,
+            move |data: &[u16], _| do_read(data, &mut sink),
+            err_cb,
+        )?,
+        cpal::SampleFormat::F32 => dev.build_input_stream(
+            &cfg_v,
+            move |data: &[f32], _| do_read(data, &mut sink),
+            err_cb,
+        )?,
+    };
 
     Ok((stream, source.into_view()))
+}
+
+fn do_write<T: Sample>(data: &mut [T], source: &mut splittable::View<Source<f32>>) {
+    if source.try_grant(data.len()).unwrap() {
+        let buf = source.view();
+
+        let offs = buf.len() - data.len();
+
+        let allowed_latency = 4;
+
+        if offs >= (data.len() * allowed_latency) {
+            tracing::debug!(
+                "Skipping a frame ({}) of samples so the output catches up",
+                data.len()
+            );
+            buf[data.len()..][..data.len()]
+                .iter()
+                .map(<T as Sample>::from)
+                .collect_slice(data);
+            source.release(data.len() * 2);
+        } else {
+            buf[..data.len()]
+                .iter()
+                .map(<T as Sample>::from)
+                .collect_slice(data);
+            source.release(data.len());
+        }
+    } else {
+        // println!("output fuck");
+        // oops
+    };
 }
 
 fn output_stream(dev: cpal::Device) -> color_eyre::Result<(cpal::Stream, Sink<f32>)> {
@@ -253,36 +302,25 @@ fn output_stream(dev: cpal::Device) -> color_eyre::Result<(cpal::Stream, Sink<f3
     let (sink, source) = rivulet::circular_buffer::<f32>(lowest_buf_size as usize * 8);
     let mut source = source.into_view();
 
-    let stream = dev.build_output_stream(
-        &cfg_v,
-        move |data: &mut [f32], _| {
-            if source.try_grant(data.len()).unwrap() {
-                let buf = source.view();
+    let err_cb = |err| tracing::warn!("output message: {:#?}", err);
 
-                let offs = buf.len() - data.len();
-
-                let allowed_latency = 4;
-
-                if offs >= (data.len() * allowed_latency) {
-                    tracing::debug!(
-                        "Skipping a frame ({}) of samples so the output catches up",
-                        data.len()
-                    );
-                    data.copy_from_slice(&buf[data.len()..][..data.len()]);
-                    source.release(data.len() * 2);
-                } else {
-                    data.copy_from_slice(&buf[..data.len()]);
-                    source.release(data.len());
-                }
-            } else {
-                // println!("output fuck");
-                // oops
-            };
-        },
-        move |err| {
-            eprintln!("output oops: {:#?}", err);
-        },
-    )?;
+    let stream = match cfg.sample_format() {
+        cpal::SampleFormat::I16 => dev.build_output_stream(
+            &cfg_v,
+            move |data: &mut [i16], _| do_write(data, &mut source),
+            err_cb,
+        )?,
+        cpal::SampleFormat::U16 => dev.build_output_stream(
+            &cfg_v,
+            move |data: &mut [u16], _| do_write(data, &mut source),
+            err_cb,
+        )?,
+        cpal::SampleFormat::F32 => dev.build_output_stream(
+            &cfg_v,
+            move |data: &mut [f32], _| do_write(data, &mut source),
+            err_cb,
+        )?,
+    };
 
     Ok((stream, sink))
 }
