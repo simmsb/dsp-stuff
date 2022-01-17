@@ -1,20 +1,21 @@
 use std::{collections::HashMap, sync::Arc};
 
+use atomig::Atomic;
+
 use crate::{
     ids::{NodeId, PortId},
     node::*,
 };
-use atomic_float::AtomicF32;
 
 pub struct SignalGen {
     id: NodeId,
     inputs: Arc<HashMap<String, PortId>>,
     outputs: PortStorage,
 
-    amplitude: AtomicF32,
-    frequency: AtomicF32,
+    amplitude: Atomic<f32>,
+    frequency: Atomic<f32>,
 
-    clock: AtomicF32,
+    clock: Atomic<f32>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -119,9 +120,9 @@ impl Node for SignalGen {
             id,
             inputs: Default::default(),
             outputs: PortStorage::default(),
-            amplitude: AtomicF32::new(0.5),
-            frequency: AtomicF32::new(20.0),
-            clock: AtomicF32::new(0.0),
+            amplitude: Atomic::new(0.5),
+            frequency: Atomic::new(20.0),
+            clock: Atomic::new(0.0),
         };
 
         this

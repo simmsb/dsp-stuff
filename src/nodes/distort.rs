@@ -4,14 +4,34 @@ use crate::{
     ids::{NodeId, PortId},
     node::*,
 };
-use atomic_float::AtomicF32;
+use atomig::Atomic;
 use collect_slice::CollectSlice;
+use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
+
+#[derive(
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    atomig::Atom,
+    strum::EnumIter,
+    strum::IntoStaticStr,
+    Clone,
+    Copy,
+)]
+#[repr(u8)]
+enum Mode {
+    SoftClip,
+    Overdrive,
+}
 
 pub struct Distort {
     id: NodeId,
     inputs: PortStorage,
     outputs: PortStorage,
-    level: AtomicF32,
+    level: Atomic<f32>,
+    mode: Atomic<Mode>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -20,6 +40,7 @@ struct DistortConfig {
     level: f32,
     inputs: HashMap<String, PortId>,
     outputs: HashMap<String, PortId>,
+    mode: Mode,
 }
 
 impl Node for Distort {
@@ -41,6 +62,7 @@ impl Node for Distort {
             level: self.level.load(std::sync::atomic::Ordering::Relaxed),
             inputs: self.inputs.all().as_ref().clone(),
             outputs: self.outputs.all().as_ref().clone(),
+            mode: self.mode.load(std::sync::atomic::Ordering::Relaxed),
         };
 
         serde_json::to_value(cfg).unwrap()
@@ -48,13 +70,14 @@ impl Node for Distort {
 
     fn restore(value: serde_json::Value) -> Self
     where
-        Self: Sized {
-
+        Self: Sized,
+    {
         let cfg: DistortConfig = serde_json::from_value(value).unwrap();
 
         let mut this = Self::new(cfg.id);
 
-        this.level.store(cfg.level, std::sync::atomic::Ordering::Relaxed);
+        this.level
+            .store(cfg.level, std::sync::atomic::Ordering::Relaxed);
         this.inputs = PortStorage::new(cfg.inputs);
         this.outputs = PortStorage::new(cfg.outputs);
 
@@ -72,7 +95,7 @@ impl Node for Distort {
     }
 
     fn render(&self, ui: &mut egui::Ui) -> egui::Response {
-        let r = ui.horizontal(|ui| {
+        let _r = ui.horizontal(|ui| {
             ui.label("Level");
 
             let mut s = self.level.load(std::sync::atomic::Ordering::Relaxed);
@@ -82,9 +105,27 @@ impl Node for Distort {
             if r.changed() {
                 self.level.store(s, std::sync::atomic::Ordering::Relaxed);
             }
-
-            r
         });
+
+        let current_mode = self.mode.load(std::sync::atomic::Ordering::Relaxed);
+        let mut mode = current_mode;
+
+        let r = egui::ComboBox::from_id_source(("distort", self.id))
+            .with_label("Mode")
+            .selected_text(<&'static str>::from(mode))
+            .show_ui(ui, |ui| {
+                for possible_mode in Mode::iter() {
+                    ui.selectable_value(
+                        &mut mode,
+                        possible_mode,
+                        <&'static str>::from(possible_mode),
+                    );
+                }
+            });
+
+        if mode != current_mode {
+            self.mode.store(mode, std::sync::atomic::Ordering::Relaxed);
+        }
 
         r.response
     }
@@ -94,14 +135,15 @@ impl Node for Distort {
             id,
             inputs: PortStorage::default(),
             outputs: PortStorage::default(),
-            level: AtomicF32::new(0.0),
+            level: Atomic::new(0.0),
+            mode: Atomic::new(Mode::SoftClip),
         };
 
         this
     }
 }
 
-fn do_distort(sample: f32, level: f32) -> f32 {
+fn do_soft_clip(sample: f32, level: f32) -> f32 {
     if level < 0.001 {
         return sample;
     }
@@ -118,6 +160,26 @@ fn do_distort(sample: f32, level: f32) -> f32 {
     sample / level
 }
 
+fn soft_clip(input: &[f32], output: &mut [f32], level: f32) {
+    input
+        .iter()
+        .cloned()
+        .map(|x| do_soft_clip(x, level))
+        .collect_slice(output);
+}
+
+fn do_overdrive(sample: f32, level: f32) -> f32 {
+    (sample * level).tanh() / sample.tanh()
+}
+
+fn overdrive(input: &[f32], output: &mut [f32], level: f32) {
+    input
+        .iter()
+        .cloned()
+        .map(|x| do_overdrive(x, level))
+        .collect_slice(output);
+}
+
 impl SimpleNode for Distort {
     fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
         let level = self.level.load(std::sync::atomic::Ordering::Relaxed);
@@ -125,12 +187,14 @@ impl SimpleNode for Distort {
         let input_id = self.inputs.get("in").unwrap();
         let output_id = self.outputs.get("out").unwrap();
 
-        inputs
-            .get(&input_id)
-            .unwrap()
-            .iter()
-            .cloned()
-            .map(|x| do_distort(x, level))
-            .collect_slice(outputs.get_mut(&output_id).unwrap());
+        let input = inputs.get(&input_id).unwrap();
+        let output = outputs.get_mut(&output_id).unwrap();
+
+        let mode = self.mode.load(std::sync::atomic::Ordering::Relaxed);
+
+        match mode {
+            Mode::SoftClip => soft_clip(input, output, level),
+            Mode::Overdrive => overdrive(input, output, level),
+        }
     }
 }

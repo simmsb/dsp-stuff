@@ -4,7 +4,7 @@ use crate::{
     ids::{NodeId, PortId},
     node::*,
 };
-use atomic_float::AtomicF32;
+use atomig::Atomic;
 use collect_slice::CollectSlice;
 use rivulet::{
     circular_buffer::{Sink, Source},
@@ -16,8 +16,8 @@ pub struct Reverb {
     id: NodeId,
     inputs: PortStorage,
     outputs: PortStorage,
-    seconds: AtomicF32,
-    decay: AtomicF32,
+    seconds: Atomic<f32>,
+    decay: Atomic<f32>,
     buffer: Arc<Mutex<(splittable::View<Source<f32>>, Sink<f32>)>>,
 }
 
@@ -140,8 +140,8 @@ impl Node for Reverb {
             id,
             inputs: PortStorage::default(),
             outputs: PortStorage::default(),
-            seconds: AtomicF32::new(0.0),
-            decay: AtomicF32::new(0.3),
+            seconds: Atomic::new(0.0),
+            decay: Atomic::new(0.3),
             buffer: Arc::new(Mutex::new((source, sink))),
         };
 

@@ -4,14 +4,14 @@ use crate::{
     ids::{NodeId, PortId},
     node::*,
 };
-use atomic_float::AtomicF32;
+use atomig::Atomic;
 use collect_slice::CollectSlice;
 
 pub struct Gain {
     id: NodeId,
     inputs: PortStorage,
     outputs: PortStorage,
-    level: AtomicF32,
+    level: Atomic<f32>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -94,7 +94,7 @@ impl Node for Gain {
             id,
             inputs: PortStorage::default(),
             outputs: PortStorage::default(),
-            level: AtomicF32::new(1.0),
+            level: Atomic::new(1.0),
         };
 
         this

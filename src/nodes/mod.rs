@@ -7,7 +7,9 @@ use crate::{
 
 pub mod distort;
 pub mod gain;
+pub mod high_pass;
 pub mod input;
+pub mod low_pass;
 pub mod mix;
 pub mod output;
 pub mod reverb;
@@ -23,6 +25,8 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<dyn Perform>)] = &[
     ("Reverb", |id| Arc::new(reverb::Reverb::new(id))),
     ("Wave view", |id| Arc::new(wave_view::WaveView::new(id))),
     ("Signal gen", |id| Arc::new(signal_gen::SignalGen::new(id))),
+    ("Low pass", |id| Arc::new(low_pass::LowPass::new(id))),
+    ("High pass", |id| Arc::new(high_pass::HighPass::new(id))),
 ];
 
 pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<dyn Perform>)] = &[
@@ -36,4 +40,6 @@ pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<dyn Perform>)] = &[
     ("signal_gen", |v| {
         Arc::new(signal_gen::SignalGen::restore(v))
     }),
+    ("low_pass", |v| Arc::new(low_pass::LowPass::restore(v))),
+    ("high_pass", |v| Arc::new(high_pass::HighPass::restore(v))),
 ];

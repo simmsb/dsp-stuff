@@ -5,30 +5,30 @@ use crate::{
     node::*,
 };
 use atomig::Atomic;
-use collect_slice::CollectSlice;
 
-pub struct Mix {
+pub struct LowPass {
     id: NodeId,
     inputs: PortStorage,
     outputs: PortStorage,
     ratio: Atomic<f32>,
+    z: Atomic<f32>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
-struct MixConfig {
+struct LowPassConfig {
     id: NodeId,
     ratio: f32,
     inputs: HashMap<String, PortId>,
     outputs: HashMap<String, PortId>,
 }
 
-impl Node for Mix {
+impl Node for LowPass {
     fn title(&self) -> &'static str {
-        "Mix"
+        "Low Pass"
     }
 
     fn cfg_name(&self) -> &'static str {
-        "mix"
+        "low_pass"
     }
 
     fn id(&self) -> NodeId {
@@ -36,7 +36,7 @@ impl Node for Mix {
     }
 
     fn save(&self) -> serde_json::Value {
-        let cfg = MixConfig {
+        let cfg = LowPassConfig {
             id: self.id,
             ratio: self.ratio.load(std::sync::atomic::Ordering::Relaxed),
             inputs: self.inputs.all().as_ref().clone(),
@@ -50,7 +50,7 @@ impl Node for Mix {
     where
         Self: Sized,
     {
-        let cfg: MixConfig = serde_json::from_value(value).unwrap();
+        let cfg: LowPassConfig = serde_json::from_value(value).unwrap();
 
         let mut this = Self::new(cfg.id);
 
@@ -63,8 +63,7 @@ impl Node for Mix {
     }
 
     fn inputs(&self) -> Arc<HashMap<String, PortId>> {
-        self.inputs.ensure_name("a");
-        self.inputs.ensure_name("b");
+        self.inputs.ensure_name("in");
         self.inputs.all()
     }
 
@@ -75,7 +74,7 @@ impl Node for Mix {
 
     fn render(&self, ui: &mut egui::Ui) -> egui::Response {
         let r = ui.horizontal(|ui| {
-            ui.label("Ratio (a:b)");
+            ui.label("Level");
 
             let mut s = self.ratio.load(std::sync::atomic::Ordering::Relaxed);
 
@@ -96,27 +95,31 @@ impl Node for Mix {
             id,
             inputs: PortStorage::default(),
             outputs: PortStorage::default(),
-            ratio: Atomic::new(0.0),
+            ratio: Atomic::new(0.5),
+            z: Atomic::new(0.0),
         };
 
         this
     }
 }
 
-impl SimpleNode for Mix {
+impl SimpleNode for LowPass {
     fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
         let ratio = self.ratio.load(std::sync::atomic::Ordering::Relaxed);
 
-        let input_a_id = self.inputs.get("a").unwrap();
-        let input_b_id = self.inputs.get("b").unwrap();
+        let input_id = self.inputs.get("in").unwrap();
         let output_id = self.outputs.get("out").unwrap();
 
-        let a = inputs.get(&input_a_id).unwrap();
-        let b = inputs.get(&input_b_id).unwrap();
+        let input = inputs.get(&input_id).unwrap();
+        let output = outputs.get_mut(&output_id).unwrap();
 
-        a.iter()
-            .zip(b.iter())
-            .map(|(a, b)| (b * ratio) + (a * (1.0 - ratio)))
-            .collect_slice(outputs.get_mut(&output_id).unwrap());
+        let mut z = self.z.load(std::sync::atomic::Ordering::Relaxed);
+
+        for (in_, out) in input.iter().zip(output.iter_mut()) {
+            *out = *in_ * (1.0 - ratio) + ratio * z;
+            z = *out;
+        }
+
+        self.z.store(z, std::sync::atomic::Ordering::Relaxed);
     }
 }
