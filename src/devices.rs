@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{atomic::AtomicBool, Arc},
+};
 
 use collect_slice::CollectSlice;
 use cpal::{
@@ -20,6 +23,7 @@ lazy_static::lazy_static! {
 
         std::thread::spawn(move || {
             let mut devices: HashMap<DeviceId, cpal::Stream> = HashMap::new();
+            let mut resync_flags: HashMap<DeviceId, Arc<AtomicBool>> = HashMap::new();
 
             for (cmd, resp_chan) in receiver {
                 match cmd {
@@ -93,10 +97,11 @@ lazy_static::lazy_static! {
                                 .unwrap();
 
                         let r = match output_stream(device) {
-                            Ok((stream, sink)) => {
+                            Ok((stream, sink, resync)) => {
                                 stream.play().unwrap();
                                 let id = DeviceId::generate();
                                 devices.insert(id, stream);
+                                resync_flags.insert(id, resync);
 
                                 Some((id, sink))
                             },
@@ -117,6 +122,13 @@ lazy_static::lazy_static! {
 
                         resp_chan.send(DeviceResponse::DeviceClosed).unwrap();
                     },
+                    DeviceCommand::TriggerResync => {
+                        for flag in resync_flags.values() {
+                            flag.store(true, std::sync::atomic::Ordering::Relaxed);
+                        }
+
+                        resp_chan.send(DeviceResponse::Resynced).unwrap();
+                    }
                 }
             }
         });
@@ -138,6 +150,7 @@ pub enum DeviceCommand {
     OpenInput(cpal::HostId, String),
     OpenOutput(cpal::HostId, String),
     CloseDevice(DeviceId),
+    TriggerResync,
 }
 
 pub enum DeviceResponse {
@@ -146,6 +159,7 @@ pub enum DeviceResponse {
     InputOpened(Option<(DeviceId, splittable::View<Source<f32>>)>),
     OutputOpened(Option<(DeviceId, Sink<f32>)>),
     DeviceClosed,
+    Resynced,
 }
 
 impl DeviceResponse {
@@ -247,24 +261,28 @@ fn input_stream(
     Ok((stream, source.into_view()))
 }
 
-fn do_write<T: Sample>(data: &mut [T], source: &mut splittable::View<Source<f32>>) {
+fn do_write<T: Sample>(
+    data: &mut [T],
+    source: &mut splittable::View<Source<f32>>,
+    trigger_catchup: &mut Arc<AtomicBool>,
+) {
     if source.try_grant(data.len()).unwrap() {
         let buf = source.view();
 
         let offs = buf.len() - data.len();
 
-        let allowed_latency = 4;
+        let allowed_latency = 2;
 
-        if offs >= (data.len() * allowed_latency) {
-            tracing::debug!(
-                "Skipping a frame ({}) of samples so the output catches up",
-                data.len()
-            );
-            buf[data.len()..][..data.len()]
+        if trigger_catchup.swap(false, std::sync::atomic::Ordering::Relaxed)
+            && offs >= (data.len() * allowed_latency)
+        {
+            tracing::debug!("Skipping {} samples so the output catches up", offs);
+            buf[offs..][..data.len()]
                 .iter()
                 .map(<T as Sample>::from)
                 .collect_slice(data);
-            source.release(data.len() * 2);
+            let len = buf.len();
+            source.release(len);
         } else {
             buf[..data.len()]
                 .iter()
@@ -273,12 +291,15 @@ fn do_write<T: Sample>(data: &mut [T], source: &mut splittable::View<Source<f32>
             source.release(data.len());
         }
     } else {
+        data.fill(<T as Sample>::from(&0.0f32));
         // println!("output fuck");
         // oops
     };
 }
 
-fn output_stream(dev: cpal::Device) -> color_eyre::Result<(cpal::Stream, Sink<f32>)> {
+fn output_stream(
+    dev: cpal::Device,
+) -> color_eyre::Result<(cpal::Stream, Sink<f32>, Arc<AtomicBool>)> {
     let cfg = dev.default_output_config()?;
     println!("{:#?}, {:#?}", cfg, cfg.config());
 
@@ -304,23 +325,26 @@ fn output_stream(dev: cpal::Device) -> color_eyre::Result<(cpal::Stream, Sink<f3
 
     let err_cb = |err| tracing::warn!("output message: {:#?}", err);
 
+    let mut trigger_catchup = Arc::new(AtomicBool::new(false));
+    let trigger_catchup_out = Arc::clone(&trigger_catchup);
+
     let stream = match cfg.sample_format() {
         cpal::SampleFormat::I16 => dev.build_output_stream(
             &cfg_v,
-            move |data: &mut [i16], _| do_write(data, &mut source),
+            move |data: &mut [i16], _| do_write(data, &mut source, &mut trigger_catchup),
             err_cb,
         )?,
         cpal::SampleFormat::U16 => dev.build_output_stream(
             &cfg_v,
-            move |data: &mut [u16], _| do_write(data, &mut source),
+            move |data: &mut [u16], _| do_write(data, &mut source, &mut trigger_catchup),
             err_cb,
         )?,
         cpal::SampleFormat::F32 => dev.build_output_stream(
             &cfg_v,
-            move |data: &mut [f32], _| do_write(data, &mut source),
+            move |data: &mut [f32], _| do_write(data, &mut source, &mut trigger_catchup),
             err_cb,
         )?,
     };
 
-    Ok((stream, sink))
+    Ok((stream, sink, trigger_catchup_out))
 }

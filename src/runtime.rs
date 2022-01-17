@@ -1,4 +1,5 @@
 use crate::{
+    devices,
     ids::{LinkId, NodeId, PortId},
     node::Perform,
     nodes,
@@ -141,6 +142,8 @@ impl UiContext {
             .get_mut(&rhs.0)
             .unwrap()
             .restart(rhs_inputs, rhs_outpus);
+
+        devices::invoke(devices::DeviceCommand::TriggerResync);
     }
 
     fn compute_inputs_for(

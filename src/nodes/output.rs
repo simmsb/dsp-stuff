@@ -68,6 +68,8 @@ impl Output {
             self.selected_device.store(Arc::new(None));
             *sink = None;
         }
+
+        devices::invoke(devices::DeviceCommand::TriggerResync);
     }
 }
 
