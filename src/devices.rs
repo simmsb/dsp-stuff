@@ -6,8 +6,9 @@ use std::{
 use collect_slice::CollectSlice;
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
-    Sample,
+    Sample, SampleRate,
 };
+use itertools::Itertools;
 use rivulet::{
     circular_buffer::{Sink, Source},
     splittable, SplittableView, View, ViewMut,
@@ -200,7 +201,7 @@ impl DeviceResponse {
     }
 }
 
-fn do_read<T: Sample>(data: &[T], sink: &mut Sink<f32>) {
+fn do_read_1<T: Sample>(data: &[T], sink: &mut Sink<f32>) {
     if sink.try_grant(data.len()).unwrap() {
         let buf = sink.view_mut();
         data.iter()
@@ -213,55 +214,102 @@ fn do_read<T: Sample>(data: &[T], sink: &mut Sink<f32>) {
     };
 }
 
+fn do_read_2<T: Sample>(data: &[T], sink: &mut Sink<f32>) {
+    let buf_len = data.len() / 2;
+    if sink.try_grant(buf_len).unwrap() {
+        let buf = sink.view_mut();
+        data.iter()
+            .step_by(2)
+            .map(Sample::to_f32)
+            .collect_slice(&mut buf[..data.len()]);
+        sink.release(data.len());
+    } else {
+        // println!("input fuck");
+        // input will fall behind
+    };
+}
+
 fn input_stream(
     dev: cpal::Device,
 ) -> color_eyre::Result<(cpal::Stream, splittable::View<Source<f32>>)> {
-    let cfg = dev.default_input_config()?;
-    println!("{:#?}, {:#?}", cfg, cfg.config());
+    let (cfg, fmt) = if let Some(cfg) = dev
+        .supported_input_configs()?
+        .filter(|cfg| {
+            cfg.min_sample_rate() <= SampleRate(48000) && cfg.max_sample_rate() >= SampleRate(48000)
+        })
+        .sorted_by_key(|cfg| cfg.channels())
+        .next()
+    {
+        let cfg = cfg.with_sample_rate(SampleRate(48000));
+        // let buf_size = match cfg.buffer_size() {
+        //     cpal::SupportedBufferSize::Range { min, max: _ } => BufferSize::Fixed(*min),
+        //     cpal::SupportedBufferSize::Unknown => BufferSize::Default,
+        // };
+        let fmt = cfg.sample_format();
+        let cfg = cfg.config();
+        // let mut cfg = cfg.config();
+        // cfg.buffer_size = buf_size;
 
-    let lowest_buf_size = match cfg.buffer_size() {
-        cpal::SupportedBufferSize::Range { min, max: _ } => *min,
-        cpal::SupportedBufferSize::Unknown => 1024, // shrug
+        (cfg, fmt)
+    } else {
+        return Err(color_eyre::eyre::eyre!(
+            "Couldn't find a valid config for device"
+        ));
     };
 
-    let mut cfg_v = cfg.config();
-    cfg_v.channels = 1;
+    tracing::info!(?cfg, "Selected input cfg");
 
-    cfg_v.buffer_size = match cfg_v.buffer_size {
-        cpal::BufferSize::Default => cpal::BufferSize::Fixed(lowest_buf_size),
-        x @ cpal::BufferSize::Fixed(_) => x,
-    };
-
-    println!("cfg: {:#?}", cfg_v);
-
-    println!("using buf size: {}", lowest_buf_size);
-
-    let (mut sink, source) = rivulet::circular_buffer::<f32>(lowest_buf_size as usize * 8);
+    let (mut sink, source) = rivulet::circular_buffer::<f32>(8192);
 
     let err_cb = |err| tracing::warn!("output message: {:#?}", err);
 
-    let stream = match cfg.sample_format() {
-        cpal::SampleFormat::I16 => dev.build_input_stream(
-            &cfg_v,
-            move |data: &[i16], _| do_read(data, &mut sink),
-            err_cb,
-        )?,
-        cpal::SampleFormat::U16 => dev.build_input_stream(
-            &cfg_v,
-            move |data: &[u16], _| do_read(data, &mut sink),
-            err_cb,
-        )?,
-        cpal::SampleFormat::F32 => dev.build_input_stream(
-            &cfg_v,
-            move |data: &[f32], _| do_read(data, &mut sink),
-            err_cb,
-        )?,
+    let stream = match cfg.channels {
+        1 => match fmt {
+            cpal::SampleFormat::I16 => dev.build_input_stream(
+                &cfg,
+                move |data: &[i16], _| do_read_1(data, &mut sink),
+                err_cb,
+            )?,
+            cpal::SampleFormat::U16 => dev.build_input_stream(
+                &cfg,
+                move |data: &[u16], _| do_read_1(data, &mut sink),
+                err_cb,
+            )?,
+            cpal::SampleFormat::F32 => dev.build_input_stream(
+                &cfg,
+                move |data: &[f32], _| do_read_1(data, &mut sink),
+                err_cb,
+            )?,
+        },
+        2 => match fmt {
+            cpal::SampleFormat::I16 => dev.build_input_stream(
+                &cfg,
+                move |data: &[i16], _| do_read_2(data, &mut sink),
+                err_cb,
+            )?,
+            cpal::SampleFormat::U16 => dev.build_input_stream(
+                &cfg,
+                move |data: &[u16], _| do_read_2(data, &mut sink),
+                err_cb,
+            )?,
+            cpal::SampleFormat::F32 => dev.build_input_stream(
+                &cfg,
+                move |data: &[f32], _| do_read_2(data, &mut sink),
+                err_cb,
+            )?,
+        },
+        n => {
+            return Err(color_eyre::eyre::eyre!(
+                "I don't know how to support devices with {} channels, idk complain on github",
+                n
+            ));
+        }
     };
 
     Ok((stream, source.into_view()))
 }
 
-fn do_write<T: Sample>(
+fn do_write_1<T: Sample>(
     data: &mut [T],
     source: &mut splittable::View<Source<f32>>,
     trigger_catchup: &mut Arc<AtomicBool>,
@@ -297,30 +345,77 @@ fn do_write<T: Sample>(
     };
 }
 
+fn do_write_2<T: Sample>(
+    data: &mut [T],
+    source: &mut splittable::View<Source<f32>>,
+    trigger_catchup: &mut Arc<AtomicBool>,
+) {
+    let buf_len = data.len() / 2;
+
+    if source.try_grant(buf_len).unwrap() {
+        let buf = source.view();
+
+        let offs = buf.len() - buf_len;
+
+        let allowed_latency = 2;
+
+        if trigger_catchup.swap(false, std::sync::atomic::Ordering::Relaxed)
+            && offs >= (buf_len * allowed_latency)
+        {
+            tracing::debug!("Skipping {} samples so the output catches up", offs);
+            Iterator::intersperse(
+                buf[offs..][..buf_len].iter().map(<T as Sample>::from),
+                <T as Sample>::from(&0.0f32),
+            )
+            .collect_slice(data);
+            let len = buf.len();
+            source.release(len);
+        } else {
+            Iterator::intersperse(
+                buf[..buf_len].iter().map(<T as Sample>::from),
+                <T as Sample>::from(&0.0f32),
+            )
+            .collect_slice(data);
+            source.release(buf_len);
+        }
+    } else {
+        data.fill(<T as Sample>::from(&0.0f32));
+        // println!("output fuck");
+        // oops
+    };
+}
+
 fn output_stream(
     dev: cpal::Device,
 ) -> color_eyre::Result<(cpal::Stream, Sink<f32>, Arc<AtomicBool>)> {
-    let cfg = dev.default_output_config()?;
-    println!("{:#?}, {:#?}", cfg, cfg.config());
+    let (cfg, fmt) = if let Some(cfg) = dev
+        .supported_output_configs()?
+        .filter(|cfg| {
+            cfg.min_sample_rate() <= SampleRate(48000) && cfg.max_sample_rate() >= SampleRate(48000)
+        })
+        .sorted_by_key(|cfg| cfg.channels())
+        .next()
+    {
+        let cfg = cfg.with_sample_rate(SampleRate(48000));
+        // let buf_size = match cfg.buffer_size() {
+        //     cpal::SupportedBufferSize::Range { min, max: _ } => BufferSize::Fixed(*min),
+        //     cpal::SupportedBufferSize::Unknown => BufferSize::Default,
+        // };
+        let fmt = cfg.sample_format();
+        let cfg = cfg.config();
+        // let mut cfg = cfg.config();
+        // cfg.buffer_size = buf_size;
 
-    let lowest_buf_size = match cfg.buffer_size() {
-        cpal::SupportedBufferSize::Range { min, max: _ } => *min,
-        cpal::SupportedBufferSize::Unknown => 1024, // shrug
+        (cfg, fmt)
+    } else {
+        return Err(color_eyre::eyre::eyre!(
+            "Couldn't find a valid config for device"
+        ));
     };
 
-    let mut cfg_v = cfg.config();
-    cfg_v.channels = 1;
+    tracing::info!(?cfg, "Selected output cfg");
 
-    cfg_v.buffer_size = match cfg_v.buffer_size {
-        cpal::BufferSize::Default => cpal::BufferSize::Fixed(lowest_buf_size),
-        x @ cpal::BufferSize::Fixed(_) => x,
-    };
-
-    println!("cfg: {:#?}", cfg_v);
-
-    println!("using buf size: {}", lowest_buf_size);
-
-    let (sink, source) = rivulet::circular_buffer::<f32>(lowest_buf_size as usize * 8);
+    let (sink, source) = rivulet::circular_buffer::<f32>(8192);
     let mut source = source.into_view();
 
     let err_cb = |err| tracing::warn!("output message: {:#?}", err);
@@ -328,22 +423,47 @@ fn output_stream(
     let mut trigger_catchup = Arc::new(AtomicBool::new(false));
     let trigger_catchup_out = Arc::clone(&trigger_catchup);
 
-    let stream = match cfg.sample_format() {
-        cpal::SampleFormat::I16 => dev.build_output_stream(
-            &cfg_v,
-            move |data: &mut [i16], _| do_write(data, &mut source, &mut trigger_catchup),
-            err_cb,
-        )?,
-        cpal::SampleFormat::U16 => dev.build_output_stream(
-            &cfg_v,
-            move |data: &mut [u16], _| do_write(data, &mut source, &mut trigger_catchup),
-            err_cb,
-        )?,
-        cpal::SampleFormat::F32 => dev.build_output_stream(
-            &cfg_v,
-            move |data: &mut [f32], _| do_write(data, &mut source, &mut trigger_catchup),
-            err_cb,
-        )?,
+    let stream = match cfg.channels {
+        1 => match fmt {
+            cpal::SampleFormat::I16 => dev.build_output_stream(
+                &cfg,
+                move |data: &mut [i16], _| do_write_1(data, &mut source, &mut trigger_catchup),
+                err_cb,
+            )?,
+            cpal::SampleFormat::U16 => dev.build_output_stream(
+                &cfg,
+                move |data: &mut [u16], _| do_write_1(data, &mut source, &mut trigger_catchup),
+                err_cb,
+            )?,
+            cpal::SampleFormat::F32 => dev.build_output_stream(
+                &cfg,
+                move |data: &mut [f32], _| do_write_1(data, &mut source, &mut trigger_catchup),
+                err_cb,
+            )?,
+        },
+        2 => match fmt {
+            cpal::SampleFormat::I16 => dev.build_output_stream(
+                &cfg,
+                move |data: &mut [i16], _| do_write_2(data, &mut source, &mut trigger_catchup),
+                err_cb,
+            )?,
+            cpal::SampleFormat::U16 => dev.build_output_stream(
+                &cfg,
+                move |data: &mut [u16], _| do_write_2(data, &mut source, &mut trigger_catchup),
+                err_cb,
+            )?,
+            cpal::SampleFormat::F32 => dev.build_output_stream(
+                &cfg,
+                move |data: &mut [f32], _| do_write_2(data, &mut source, &mut trigger_catchup),
+                err_cb,
+            )?,
+        },
+        n => {
+            return Err(color_eyre::eyre::eyre!(
+                "I don't know how to support devices with {} channels, idk complain on github",
+                n
+            ));
+        }
     };
 
     Ok((stream, sink, trigger_catchup_out))

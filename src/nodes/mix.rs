@@ -96,7 +96,7 @@ impl Node for Mix {
             id,
             inputs: PortStorage::default(),
             outputs: PortStorage::default(),
-            ratio: Atomic::new(0.0),
+            ratio: Atomic::new(0.5),
         };
 
         this
