@@ -419,7 +419,7 @@ struct LinkConfig {
 
 impl LinkInstance {
     fn new(id: LinkId, lhs: (NodeId, PortId), rhs: (NodeId, PortId)) -> Self {
-        let (sink, source) = rivulet::circular_buffer::<f32>(128);
+        let (sink, source) = rivulet::circular_buffer::<f32>(8192);
         let source = source.into_view();
 
         Self {
