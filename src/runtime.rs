@@ -14,12 +14,14 @@ use rivulet::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet},
     io::Write,
     ops::DerefMut,
+    rc::Rc,
     sync::Arc,
 };
-use tokio::sync::Mutex;
+use tokio::{runtime::Handle, sync::Mutex};
 
 pub struct UiContext {
     runtime: tokio::runtime::Runtime,
@@ -126,24 +128,12 @@ impl UiContext {
         }
     }
 
-    fn update_links(&mut self, lhs: (NodeId, PortId), rhs: (NodeId, PortId)) {
+    fn restart_node(&mut self, node: NodeId) {
         let _guard = self.runtime.enter();
 
-        let lhs_inputs = self.compute_inputs_for(lhs.0);
-        let lhs_outpus = self.compute_outputs_for(lhs.0);
-        self.nodes
-            .get_mut(&lhs.0)
-            .unwrap()
-            .restart(lhs_inputs, lhs_outpus);
-
-        let rhs_inputs = self.compute_inputs_for(rhs.0);
-        let rhs_outpus = self.compute_outputs_for(rhs.0);
-        self.nodes
-            .get_mut(&rhs.0)
-            .unwrap()
-            .restart(rhs_inputs, rhs_outpus);
-
-        devices::invoke(devices::DeviceCommand::TriggerResync);
+        let inputs = self.compute_inputs_for(node);
+        let outpus = self.compute_outputs_for(node);
+        self.nodes.get_mut(&node).unwrap().restart(inputs, outpus);
     }
 
     fn compute_inputs_for(
@@ -198,42 +188,60 @@ impl UiContext {
             }
         }
 
-        let nodes = self.nodes.values().map(|node| {
-            let mut n = NodeConstructor::new(node.id.get(), NodeArgs::default())
-                .with_title(|ui| ui.label(format!("{} ({:?})", node.instance.title(), node.id)))
-                .with_content(|ui| node.instance.render(ui))
-                .with_origin(node.position);
+        let nodes_to_delete = Rc::new(RefCell::new(Vec::new()));
 
-            for (input, id) in node
-                .instance
-                .inputs()
-                .iter()
-                .map(|(k, v)| (k.to_owned(), *v))
-            {
-                n = n.with_input_attribute(id.get(), PinArgs::default(), move |ui| {
-                    ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
-                        ui.label(input)
+        let nodes = self
+            .nodes
+            .values()
+            .map(|node| {
+                let nodes_to_delete = Rc::clone(&nodes_to_delete);
+                let mut n = NodeConstructor::new(node.id.get(), NodeArgs::default())
+                    .with_title(move |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{} ({:?})", node.instance.title(), node.id))
+                                .on_hover_text(node.instance.description());
+                            ui.with_layout(egui::Layout::right_to_left(), move |ui| {
+                                if ui.button("Close").clicked() {
+                                    nodes_to_delete.borrow_mut().push(node.id);
+                                }
+                            })
+                        })
+                        .response
                     })
-                    .inner
-                });
-            }
+                    .with_content(|ui| node.instance.render(ui))
+                    .with_origin(node.position);
 
-            for (output, id) in node
-                .instance
-                .outputs()
-                .iter()
-                .map(|(k, v)| (k.to_owned(), *v))
-            {
-                n = n.with_output_attribute(id.get(), PinArgs::default(), move |ui| {
-                    ui.with_layout(egui::Layout::top_down(egui::Align::RIGHT), |ui| {
-                        ui.label(output)
-                    })
-                    .inner
-                });
-            }
+                for (input, id) in node
+                    .instance
+                    .inputs()
+                    .iter()
+                    .map(|(k, v)| (k.to_owned(), *v))
+                {
+                    n = n.with_input_attribute(id.get(), PinArgs::default(), move |ui| {
+                        ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                            ui.label(input)
+                        })
+                        .inner
+                    });
+                }
 
-            n
-        });
+                for (output, id) in node
+                    .instance
+                    .outputs()
+                    .iter()
+                    .map(|(k, v)| (k.to_owned(), *v))
+                {
+                    n = n.with_output_attribute(id.get(), PinArgs::default(), move |ui| {
+                        ui.with_layout(egui::Layout::top_down(egui::Align::RIGHT), |ui| {
+                            ui.label(output)
+                        })
+                        .inner
+                    });
+                }
+
+                n
+            })
+            .collect_vec();
 
         let links = self
             .links
@@ -251,7 +259,9 @@ impl UiContext {
                     self.outputs.get_mut(&inst.lhs).unwrap().remove(&id);
                     self.inputs.get_mut(&inst.rhs).unwrap().remove(&id);
 
-                    self.update_links(inst.lhs, inst.rhs);
+                    self.restart_node(inst.lhs.0);
+                    self.restart_node(inst.rhs.0);
+                    devices::invoke(devices::DeviceCommand::TriggerResync);
                 } else {
                     tracing::warn!("GUI told us to remove link {:?} which isn't tracked", id);
                 }
@@ -268,10 +278,14 @@ impl UiContext {
 
             if self.inputs.contains_key(&start) && self.outputs.contains_key(&end) {
                 self.add_link(end, start);
-                self.update_links(end, start)
+                self.restart_node(end.0);
+                self.restart_node(start.0);
+                devices::invoke(devices::DeviceCommand::TriggerResync);
             } else if self.inputs.contains_key(&end) && self.outputs.contains_key(&start) {
                 self.add_link(start, end);
-                self.update_links(start, end)
+                self.restart_node(end.0);
+                self.restart_node(start.0);
+                devices::invoke(devices::DeviceCommand::TriggerResync);
             } else {
                 tracing::debug!(
                     "Attempt to create out-out or in-in link between {:?}, {:?}",
@@ -279,6 +293,47 @@ impl UiContext {
                     end
                 );
             };
+        }
+
+        for node_to_delete in nodes_to_delete.borrow().iter() {
+            tracing::info!("Deleting node {:?}", node_to_delete);
+            if let Some(n) = self.nodes.get_mut(node_to_delete) {
+                let _guard = self.runtime.enter();
+                n.stop();
+            }
+
+            let links_to_remove = self
+                .links
+                .iter()
+                .filter(|(_, l)| *node_to_delete == l.lhs.0 || *node_to_delete == l.rhs.0)
+                .map(|(k, l)| (*k, l.lhs, l.rhs))
+                .collect_vec();
+
+            let mut nodes_to_restart = HashSet::new();
+
+            for (link, lhs, rhs) in &links_to_remove {
+                self.outputs.get_mut(lhs).unwrap().remove(link);
+                self.inputs.get_mut(rhs).unwrap().remove(link);
+
+                if lhs.0 != *node_to_delete {
+                    nodes_to_restart.insert(lhs.0);
+                } else if rhs.0 != *node_to_delete {
+                    nodes_to_restart.insert(rhs.0);
+                }
+            }
+
+            for node_to_restart in nodes_to_restart {
+                self.restart_node(node_to_restart);
+            }
+
+            // remove links here so that the buffers stay alive until the node restarts without them
+            for (link, _, _) in links_to_remove {
+                self.links.remove(&link);
+            }
+
+            self.nodes.remove(node_to_delete);
+            self.inputs.retain(|(n, _), _| n != node_to_delete);
+            self.outputs.retain(|(n, _), _| n != node_to_delete);
         }
     }
 
@@ -385,7 +440,15 @@ impl eframe::epi::App for UiContext {
                             self.update_theme(theme);
                         }
                     }
-                })
+                });
+
+                if ui
+                    .button("Sync output")
+                    .on_hover_text("Flush buffers to get rid of any built up latency")
+                    .clicked()
+                {
+                    devices::invoke(devices::DeviceCommand::TriggerResync);
+                }
             });
         });
 
@@ -588,8 +651,10 @@ impl NodeInstance {
 
     fn stop(&mut self) {
         tracing::debug!(id = ?self.id, "Stopping node");
-        if let Some((_, stop)) = self.task.take() {
+        if let Some((handle, stop)) = self.task.take() {
+            let rthandle = Handle::current();
             let _ = stop.send(());
+            let _ = rthandle.block_on(handle);
         }
     }
 

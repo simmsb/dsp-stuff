@@ -53,6 +53,10 @@ impl Node for Distort {
         "distort"
     }
 
+    fn description(&self) -> &'static str {
+        "Distortion effects"
+    }
+
     fn id(&self) -> NodeId {
         self.id
     }

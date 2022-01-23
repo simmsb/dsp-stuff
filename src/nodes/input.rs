@@ -80,6 +80,10 @@ impl Node for Input {
         "input"
     }
 
+    fn description(&self) -> &'static str {
+        "Stream audio from an input device"
+    }
+
     fn id(&self) -> NodeId {
         self.id
     }

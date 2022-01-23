@@ -33,6 +33,10 @@ impl Node for Chebyshev {
         "chebyshev"
     }
 
+    fn description(&self) -> &'static str {
+        "Chebyshev distortion?"
+    }
+
     fn id(&self) -> NodeId {
         self.id
     }

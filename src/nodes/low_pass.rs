@@ -31,6 +31,10 @@ impl Node for LowPass {
         "low_pass"
     }
 
+    fn description(&self) -> &'static str {
+        "Attenuates higher frequencies"
+    }
+
     fn id(&self) -> NodeId {
         self.id
     }

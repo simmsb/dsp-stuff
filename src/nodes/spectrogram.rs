@@ -42,6 +42,10 @@ impl Node for Spectrogram {
         "spectrogram"
     }
 
+    fn description(&self) -> &'static str {
+        "Inspect the volume of individual frequencies over time"
+    }
+
     fn id(&self) -> NodeId {
         self.id
     }
@@ -196,13 +200,15 @@ impl Perform for Spectrogram {
 
         processor.compute_all();
 
-        let mut queue = self.buffer.lock().unwrap();
-        queue.push_back(processor.freq_buffer);
+        {
+            let mut queue = self.buffer.lock().unwrap();
+            queue.push_back(processor.freq_buffer);
 
-        let target_len = self.buffer_size.load(atomig::Ordering::Relaxed);
+            let target_len = self.buffer_size.load(atomig::Ordering::Relaxed);
 
-        while queue.len() > target_len {
-            queue.pop_front();
+            while queue.len() > target_len {
+                queue.pop_front();
+            }
         }
 
         for input in inputs.values_mut() {

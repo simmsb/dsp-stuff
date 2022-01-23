@@ -43,6 +43,8 @@ pub trait Node: Send + Sync {
 
     fn cfg_name(&self) -> &'static str;
 
+    fn description(&self) -> &'static str;
+
     fn id(&self) -> NodeId;
 
     /// The ids and names of the input nodes

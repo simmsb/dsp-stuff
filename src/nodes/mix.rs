@@ -31,6 +31,10 @@ impl Node for Mix {
         "mix"
     }
 
+    fn description(&self) -> &'static str {
+        "Mix two signals together"
+    }
+
     fn id(&self) -> NodeId {
         self.id
     }

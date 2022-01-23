@@ -36,6 +36,10 @@ impl Node for WaveView {
         "wave_view"
     }
 
+    fn description(&self) -> &'static str {
+        "Inspect the waveform of a signal"
+    }
+
     fn id(&self) -> NodeId {
         self.id
     }

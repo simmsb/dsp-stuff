@@ -60,6 +60,10 @@ impl Node for Reverb {
         "reverb"
     }
 
+    fn description(&self) -> &'static str {
+        "Repeat/ echo sounds with a given delay and decay factor"
+    }
+
     fn id(&self) -> NodeId {
         self.id
     }

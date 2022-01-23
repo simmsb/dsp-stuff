@@ -5,6 +5,7 @@ use crate::{
     node::{Node, Perform},
 };
 
+pub mod chebyshev;
 pub mod distort;
 pub mod gain;
 pub mod high_pass;
@@ -16,7 +17,6 @@ pub mod reverb;
 pub mod signal_gen;
 pub mod spectrogram;
 pub mod wave_view;
-pub mod chebyshev;
 
 pub static NODES: &[(&str, fn(NodeId) -> Arc<dyn Perform>)] = &[
     ("Input", |id| Arc::new(input::Input::new(id))),

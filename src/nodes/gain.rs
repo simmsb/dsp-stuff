@@ -31,6 +31,10 @@ impl Node for Gain {
         "gain"
     }
 
+    fn description(&self) -> &'static str {
+        "Adjust gain of a signal"
+    }
+
     fn id(&self) -> NodeId {
         self.id
     }

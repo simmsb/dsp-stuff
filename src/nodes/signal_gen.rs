@@ -36,6 +36,10 @@ impl Node for SignalGen {
         "signal_gen"
     }
 
+    fn description(&self) -> &'static str {
+        "Generate a signal with a given frequency and amplitude"
+    }
+
     fn id(&self) -> NodeId {
         self.id
     }
