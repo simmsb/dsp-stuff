@@ -16,6 +16,7 @@ pub mod reverb;
 pub mod signal_gen;
 pub mod spectrogram;
 pub mod wave_view;
+pub mod chebyshev;
 
 pub static NODES: &[(&str, fn(NodeId) -> Arc<dyn Perform>)] = &[
     ("Input", |id| Arc::new(input::Input::new(id))),
@@ -23,6 +24,7 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<dyn Perform>)] = &[
     ("Gain", |id| Arc::new(gain::Gain::new(id))),
     ("Mix", |id| Arc::new(mix::Mix::new(id))),
     ("Distort", |id| Arc::new(distort::Distort::new(id))),
+    ("Chebyshev", |id| Arc::new(chebyshev::Chebyshev::new(id))),
     ("Reverb", |id| Arc::new(reverb::Reverb::new(id))),
     ("Wave view", |id| Arc::new(wave_view::WaveView::new(id))),
     ("Spectrogram", |id| {
@@ -39,6 +41,7 @@ pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<dyn Perform>)] = &[
     ("gain", |v| Arc::new(gain::Gain::restore(v))),
     ("mix", |v| Arc::new(mix::Mix::restore(v))),
     ("distort", |v| Arc::new(distort::Distort::restore(v))),
+    ("chebyshev", |v| Arc::new(chebyshev::Chebyshev::restore(v))),
     ("reverb", |v| Arc::new(reverb::Reverb::restore(v))),
     ("wave_view", |v| Arc::new(wave_view::WaveView::restore(v))),
     ("spectrogram", |v| {
