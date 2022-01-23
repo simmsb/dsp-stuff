@@ -1,5 +1,3 @@
-#![feature(iter_intersperse)]
-
 mod devices;
 mod ids;
 mod node;
