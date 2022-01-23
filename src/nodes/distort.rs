@@ -23,7 +23,8 @@ use strum::IntoEnumIterator;
 #[repr(u8)]
 enum Mode {
     SoftClip,
-    Overdrive,
+    Tanh,
+    RecipSoftClip,
 }
 
 pub struct Distort {
@@ -168,15 +169,37 @@ fn soft_clip(input: &[f32], output: &mut [f32], level: f32) {
         .collect_slice(output);
 }
 
-fn do_overdrive(sample: f32, level: f32) -> f32 {
-    (sample * level).tanh() / sample.tanh()
+fn do_recip_soft_clip(sample: f32, level: f32) -> f32 {
+    if level < 0.001 {
+        return sample;
+    }
+
+    let sample = sample.signum() * (1.0 - 1.0 / (sample.abs() * level + 1.0));
+
+    sample
 }
 
-fn overdrive(input: &[f32], output: &mut [f32], level: f32) {
+fn recip_soft_clip(input: &[f32], output: &mut [f32], level: f32) {
     input
         .iter()
         .cloned()
-        .map(|x| do_overdrive(x, level))
+        .map(|x| do_recip_soft_clip(x, level))
+        .collect_slice(output);
+}
+
+fn do_tanh(sample: f32, level: f32) -> f32 {
+    if level < 0.001 {
+        return sample;
+    }
+
+    (sample * level).tanh()
+}
+
+fn tanh(input: &[f32], output: &mut [f32], level: f32) {
+    input
+        .iter()
+        .cloned()
+        .map(|x| do_tanh(x, level))
         .collect_slice(output);
 }
 
@@ -194,7 +217,8 @@ impl SimpleNode for Distort {
 
         match mode {
             Mode::SoftClip => soft_clip(input, output, level),
-            Mode::Overdrive => overdrive(input, output, level),
+            Mode::Tanh => tanh(input, output, level),
+            Mode::RecipSoftClip => recip_soft_clip(input, output, level),
         }
     }
 }
