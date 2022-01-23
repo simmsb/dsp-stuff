@@ -221,7 +221,7 @@ fn do_read_2<T: Sample>(data: &[T], sink: &mut Sink<f32>) {
         data.iter()
             .step_by(2)
             .map(Sample::to_f32)
-            .collect_slice(&mut buf[..data.len()]);
+            .collect_slice(&mut buf[..buf_len]);
         sink.release(data.len());
     } else {
         // println!("input fuck");
