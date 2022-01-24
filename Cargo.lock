@@ -850,7 +850,7 @@ dependencies = [
 [[package]]
 name = "eframe"
 version = "0.16.0"
-source = "git+https://github.com/simmsb/egui?rev=0f7e7ecad89267e58a241e737636f06a69ac1101#0f7e7ecad89267e58a241e737636f06a69ac1101"
+source = "git+https://github.com/simmsb/egui?rev=17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5#17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5"
 dependencies = [
  "egui",
  "egui-winit",
@@ -862,7 +862,7 @@ dependencies = [
 [[package]]
 name = "egui"
 version = "0.16.1"
-source = "git+https://github.com/simmsb/egui?rev=0f7e7ecad89267e58a241e737636f06a69ac1101#0f7e7ecad89267e58a241e737636f06a69ac1101"
+source = "git+https://github.com/simmsb/egui?rev=17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5#17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5"
 dependencies = [
  "ahash",
  "epaint",
@@ -872,7 +872,7 @@ dependencies = [
 [[package]]
 name = "egui-winit"
 version = "0.16.0"
-source = "git+https://github.com/simmsb/egui?rev=0f7e7ecad89267e58a241e737636f06a69ac1101#0f7e7ecad89267e58a241e737636f06a69ac1101"
+source = "git+https://github.com/simmsb/egui?rev=17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5#17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5"
 dependencies = [
  "copypasta",
  "egui",
@@ -884,7 +884,7 @@ dependencies = [
 [[package]]
 name = "egui_glow"
 version = "0.16.0"
-source = "git+https://github.com/simmsb/egui?rev=0f7e7ecad89267e58a241e737636f06a69ac1101#0f7e7ecad89267e58a241e737636f06a69ac1101"
+source = "git+https://github.com/simmsb/egui?rev=17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5#17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5"
 dependencies = [
  "egui",
  "egui-winit",
@@ -908,7 +908,7 @@ dependencies = [
 [[package]]
 name = "egui_web"
 version = "0.16.0"
-source = "git+https://github.com/simmsb/egui?rev=0f7e7ecad89267e58a241e737636f06a69ac1101#0f7e7ecad89267e58a241e737636f06a69ac1101"
+source = "git+https://github.com/simmsb/egui?rev=17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5#17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5"
 dependencies = [
  "egui",
  "epi",
@@ -927,7 +927,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "emath"
 version = "0.16.0"
-source = "git+https://github.com/simmsb/egui?rev=0f7e7ecad89267e58a241e737636f06a69ac1101#0f7e7ecad89267e58a241e737636f06a69ac1101"
+source = "git+https://github.com/simmsb/egui?rev=17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5#17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5"
 
 [[package]]
 name = "env_logger"
@@ -945,7 +945,7 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.16.0"
-source = "git+https://github.com/simmsb/egui?rev=0f7e7ecad89267e58a241e737636f06a69ac1101#0f7e7ecad89267e58a241e737636f06a69ac1101"
+source = "git+https://github.com/simmsb/egui?rev=17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5#17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5"
 dependencies = [
  "ab_glyph",
  "ahash",
@@ -957,7 +957,7 @@ dependencies = [
 [[package]]
 name = "epi"
 version = "0.16.0"
-source = "git+https://github.com/simmsb/egui?rev=0f7e7ecad89267e58a241e737636f06a69ac1101#0f7e7ecad89267e58a241e737636f06a69ac1101"
+source = "git+https://github.com/simmsb/egui?rev=17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5#17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5"
 dependencies = [
  "egui",
 ]

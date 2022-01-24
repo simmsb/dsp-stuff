@@ -5,7 +5,7 @@ use crate::{
     nodes,
     theme::{self, Theme},
 };
-use egui::{pos2, Visuals};
+use egui::{pos2, Visuals, Widget};
 use egui_nodes::{AttributeFlags, ColorStyle, LinkArgs, NodeArgs, NodeConstructor, PinArgs};
 use itertools::Itertools;
 use rivulet::{
@@ -198,10 +198,12 @@ impl UiContext {
                 let mut n = NodeConstructor::new(node.id.get(), NodeArgs::default())
                     .with_title(move |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(format!("{} ({:?})", node.instance.title(), node.id))
+                            ui.label(format!("{} ({})", node.instance.title(), node.id.get()))
                                 .on_hover_text(node.instance.description());
                             ui.with_layout(egui::Layout::right_to_left(), move |ui| {
-                                if ui.button("Close").clicked() {
+                                let button = egui::Button::new("Close")
+                                    .with_id((node.id.get(), "node_close"));
+                                if button.ui(ui).clicked() {
                                     nodes_to_delete.borrow_mut().push(node.id);
                                 }
                             })

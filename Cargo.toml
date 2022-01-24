@@ -32,10 +32,10 @@ strum = { version = "0.23.0", features = ["derive"] }
 audioviz = { version = "0.4.4", default-features = false }
 
 [patch.crates-io]
-egui = { git = "https://github.com/simmsb/egui", rev = "0f7e7ecad89267e58a241e737636f06a69ac1101" }
-eframe = { git = "https://github.com/simmsb/egui", rev = "0f7e7ecad89267e58a241e737636f06a69ac1101" }
-epi = { git = "https://github.com/simmsb/egui", rev = "0f7e7ecad89267e58a241e737636f06a69ac1101" }
-egui_glow = { git = "https://github.com/simmsb/egui", rev = "0f7e7ecad89267e58a241e737636f06a69ac1101" }
+egui = { git = "https://github.com/simmsb/egui", rev = "17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5" }
+eframe = { git = "https://github.com/simmsb/egui", rev = "17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5" }
+epi = { git = "https://github.com/simmsb/egui", rev = "17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5" }
+egui_glow = { git = "https://github.com/simmsb/egui", rev = "17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5" }
 
 [features]
 console = ["console-subscriber"]
