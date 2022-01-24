@@ -2,7 +2,7 @@
 
 A node based audio effects thing.
 
-![image](https://user-images.githubusercontent.com/5330444/150650941-2002c230-7093-4cf2-a075-637547c260cc.png)
+![image](https://user-images.githubusercontent.com/5330444/150704818-13342938-4914-413a-899f-fd975bdba5ab.png)
 
 
 # Usage
