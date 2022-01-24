@@ -131,7 +131,7 @@ impl Node for Input {
         this
     }
 
-    fn render(&self, ui: &mut egui::Ui) -> egui::Response {
+    fn render(&self, ui: &mut egui::Ui) {
         let current_host = **self.selected_host.load();
         let mut selected_host = current_host;
 
@@ -169,7 +169,7 @@ impl Node for Input {
 
         let devices = self.cached_devices.load();
 
-        let r = cb.show_ui(ui, |ui| {
+        cb.show_ui(ui, |ui| {
             for device in devices.iter() {
                 ui.selectable_value(&mut selected_device, Some(device.clone()), device);
             }
@@ -180,8 +180,6 @@ impl Node for Input {
         if current_device != selected_device {
             self.load_device(selected_host, selected_device);
         }
-
-        r.response
     }
 
     fn new(id: NodeId) -> Self {

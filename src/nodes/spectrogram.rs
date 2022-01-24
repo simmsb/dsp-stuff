@@ -85,8 +85,8 @@ impl Node for Spectrogram {
         this
     }
 
-    fn render(&self, ui: &mut egui::Ui) -> egui::Response {
-        let _r = Frame::dark_canvas(ui.style()).show(ui, |ui| {
+    fn render(&self, ui: &mut egui::Ui) {
+        Frame::dark_canvas(ui.style()).show(ui, |ui| {
             ui.ctx().request_repaint();
 
             let desired_size = vec2(200.0, 140.0);
@@ -137,7 +137,7 @@ impl Node for Spectrogram {
             ui.painter().add(Shape::mesh(mesh));
         });
 
-        let _r = ui.horizontal(|ui| {
+        ui.horizontal(|ui| {
             ui.label("FFT Size");
 
             let mut s = self.fft_size.load(atomig::Ordering::Relaxed);
@@ -149,7 +149,7 @@ impl Node for Spectrogram {
             }
         });
 
-        let r = ui.horizontal(|ui| {
+        ui.horizontal(|ui| {
             ui.label("Buffer Size");
             let mut s = self.buffer_size.load(atomig::Ordering::Relaxed);
 
@@ -159,8 +159,6 @@ impl Node for Spectrogram {
                 self.buffer_size.store(s, atomig::Ordering::Relaxed);
             }
         });
-
-        r.response
     }
 
     fn new(id: NodeId) -> Self {

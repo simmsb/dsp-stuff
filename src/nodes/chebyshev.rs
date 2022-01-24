@@ -81,8 +81,8 @@ impl Node for Chebyshev {
         self.outputs.all()
     }
 
-    fn render(&self, ui: &mut egui::Ui) -> egui::Response {
-        let _r = ui.horizontal(|ui| {
+    fn render(&self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
             ui.label("Level (pos)");
 
             let mut s = self.level_pos.load(std::sync::atomic::Ordering::Relaxed);
@@ -94,7 +94,7 @@ impl Node for Chebyshev {
             }
         });
 
-        let r = ui.horizontal(|ui| {
+        ui.horizontal(|ui| {
             ui.label("Level (neg)");
 
             let mut s = self.level_neg.load(std::sync::atomic::Ordering::Relaxed);
@@ -105,8 +105,6 @@ impl Node for Chebyshev {
                 self.level_neg.store(s, std::sync::atomic::Ordering::Relaxed);
             }
         });
-
-        r.response
     }
 
     fn new(id: NodeId) -> Self {

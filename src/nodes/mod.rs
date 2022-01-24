@@ -7,11 +7,13 @@ use crate::{
 
 pub mod chebyshev;
 pub mod distort;
+pub mod envelope;
 pub mod gain;
 pub mod high_pass;
 pub mod input;
 pub mod low_pass;
 pub mod mix;
+pub mod multiply;
 pub mod output;
 pub mod reverb;
 pub mod signal_gen;
@@ -23,6 +25,7 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<dyn Perform>)] = &[
     ("Output", |id| Arc::new(output::Output::new(id))),
     ("Gain", |id| Arc::new(gain::Gain::new(id))),
     ("Mix", |id| Arc::new(mix::Mix::new(id))),
+    ("Multiply", |id| Arc::new(multiply::Multiply::new(id))),
     ("Distort", |id| Arc::new(distort::Distort::new(id))),
     ("Chebyshev", |id| Arc::new(chebyshev::Chebyshev::new(id))),
     ("Reverb", |id| Arc::new(reverb::Reverb::new(id))),
@@ -33,6 +36,7 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<dyn Perform>)] = &[
     ("Signal gen", |id| Arc::new(signal_gen::SignalGen::new(id))),
     ("Low pass", |id| Arc::new(low_pass::LowPass::new(id))),
     ("High pass", |id| Arc::new(high_pass::HighPass::new(id))),
+    ("Envelope", |id| Arc::new(envelope::Envelope::new(id))),
 ];
 
 pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<dyn Perform>)] = &[
@@ -40,6 +44,7 @@ pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<dyn Perform>)] = &[
     ("output", |v| Arc::new(output::Output::restore(v))),
     ("gain", |v| Arc::new(gain::Gain::restore(v))),
     ("mix", |v| Arc::new(mix::Mix::restore(v))),
+    ("multiply", |v| Arc::new(multiply::Multiply::restore(v))),
     ("distort", |v| Arc::new(distort::Distort::restore(v))),
     ("chebyshev", |v| Arc::new(chebyshev::Chebyshev::restore(v))),
     ("reverb", |v| Arc::new(reverb::Reverb::restore(v))),
@@ -52,4 +57,5 @@ pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<dyn Perform>)] = &[
     }),
     ("low_pass", |v| Arc::new(low_pass::LowPass::restore(v))),
     ("high_pass", |v| Arc::new(high_pass::HighPass::restore(v))),
+    ("envelope", |v| Arc::new(envelope::Envelope::restore(v))),
 ];

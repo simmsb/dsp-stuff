@@ -53,7 +53,7 @@ pub trait Node: Send + Sync {
     /// The ids and names of the output nodes
     fn outputs(&self) -> Arc<HashMap<String, PortId>>;
 
-    fn render(&self, ui: &mut egui::Ui) -> egui::Response;
+    fn render(&self, ui: &mut egui::Ui);
 
     fn new(id: NodeId) -> Self
     where

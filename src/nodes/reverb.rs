@@ -107,7 +107,7 @@ impl Node for Reverb {
         this
     }
 
-    fn render(&self, ui: &mut egui::Ui) -> egui::Response {
+    fn render(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Delay (s)");
 
@@ -119,7 +119,7 @@ impl Node for Reverb {
             }
         });
 
-        let r = ui.horizontal(|ui| {
+        ui.horizontal(|ui| {
             ui.label("Decay");
 
             let mut s = self.decay.load(std::sync::atomic::Ordering::Relaxed);
@@ -129,8 +129,6 @@ impl Node for Reverb {
                 self.decay.store(s, std::sync::atomic::Ordering::Relaxed);
             }
         });
-
-        r.response
     }
 
     fn new(id: NodeId) -> Self {

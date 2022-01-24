@@ -75,8 +75,8 @@ impl Node for Gain {
         self.outputs.all()
     }
 
-    fn render(&self, ui: &mut egui::Ui) -> egui::Response {
-        let r = ui.horizontal(|ui| {
+    fn render(&self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
             ui.label("Level");
 
             let mut s = self.level.load(std::sync::atomic::Ordering::Relaxed);
@@ -89,8 +89,6 @@ impl Node for Gain {
 
             r
         });
-
-        r.response
     }
 
     fn new(id: NodeId) -> Self {

@@ -77,8 +77,8 @@ impl Node for Mix {
         self.outputs.all()
     }
 
-    fn render(&self, ui: &mut egui::Ui) -> egui::Response {
-        let r = ui.horizontal(|ui| {
+    fn render(&self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
             ui.label("Ratio (a:b)");
 
             let mut s = self.ratio.load(std::sync::atomic::Ordering::Relaxed);
@@ -91,8 +91,6 @@ impl Node for Mix {
 
             r
         });
-
-        r.response
     }
 
     fn new(id: NodeId) -> Self {

@@ -7,18 +7,22 @@ use crate::{
     ids::{NodeId, PortId},
     node::*,
 };
+use atomig::Atomic;
 use egui::{emath::RectTransform, epaint::Shape, pos2, vec2, Color32, Frame, Rect, Stroke};
 use rivulet::{
     circular_buffer::{Sink, Source},
     splittable, SplittableView, View, ViewMut,
 };
+use simple_moving_average::{SumTreeSMA, SMA};
 
 pub struct WaveView {
     id: NodeId,
     outputs: Arc<HashMap<String, PortId>>,
     inputs: PortStorage,
+    average_throughput: Arc<Mutex<SumTreeSMA<f32, f32, 32>>>,
     view_sink: Arc<Mutex<Sink<f32>>>,
     view_source: Arc<Mutex<splittable::View<Source<f32>>>>,
+    should_count_input: Atomic<bool>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -75,13 +79,27 @@ impl Node for WaveView {
         this
     }
 
-    fn render(&self, ui: &mut egui::Ui) -> egui::Response {
+    fn render(&self, ui: &mut egui::Ui) {
         let mut source = self.view_source.lock().unwrap();
         // we need to do this so the source updates itself
         let _ = source.try_grant(128);
         let view = source.view();
 
-        let r = Frame::dark_canvas(ui.style()).show(ui, |ui| {
+        let mut averager = self.average_throughput.lock().unwrap();
+
+        if self
+            .should_count_input
+            .swap(false, atomig::Ordering::Relaxed)
+        {
+            averager.add_sample(view.len() as f32);
+        } else {
+            averager.add_sample(0.0);
+        }
+
+        let current_average = averager.get_average() as usize;
+        let samples_this_render = current_average.max(0).min(view.len());
+
+        Frame::dark_canvas(ui.style()).show(ui, |ui| {
             ui.ctx().request_repaint();
 
             let desired_size = vec2(120.0, 50.0);
@@ -90,13 +108,11 @@ impl Node for WaveView {
             let to_screen =
                 RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, -1.0..=1.0), rect);
 
-            let num_samples = view.len() as f32;
-
-            let points = view
+            let points = view[..samples_this_render]
                 .iter()
                 .enumerate()
                 .map(|(i, y)| {
-                    let x = (i as f32) / num_samples;
+                    let x = (i as f32) / samples_this_render as f32;
                     //let y = y.min(1.0).max(-1.0);
 
                     to_screen * pos2(x, *y)
@@ -113,10 +129,7 @@ impl Node for WaveView {
             ui.painter().extend(vec![line]);
         });
 
-        let l = view.len();
-        source.release(l);
-
-        r.response
+        source.release(samples_this_render);
     }
 
     fn new(id: NodeId) -> Self {
@@ -126,8 +139,10 @@ impl Node for WaveView {
             id,
             inputs: PortStorage::default(),
             outputs: Default::default(),
+            average_throughput: Arc::new(Mutex::new(SumTreeSMA::new())),
             view_sink: Arc::new(Mutex::new(sink)),
             view_source: Arc::new(Mutex::new(source)),
+            should_count_input: Atomic::new(false),
         };
 
         this
@@ -147,6 +162,9 @@ impl SimpleNode for WaveView {
 
         if sink.try_grant(input.len()).unwrap_or(false) {
             let view = &mut sink.view_mut()[..input.len()];
+
+            self.should_count_input
+                .store(true, atomig::Ordering::Relaxed);
 
             view.copy_from_slice(input);
             sink.release(input.len());

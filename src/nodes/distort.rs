@@ -83,6 +83,7 @@ impl Node for Distort {
 
         this.level
             .store(cfg.level, std::sync::atomic::Ordering::Relaxed);
+        this.mode.store(cfg.mode, std::sync::atomic::Ordering::Relaxed);
         this.inputs = PortStorage::new(cfg.inputs);
         this.outputs = PortStorage::new(cfg.outputs);
 
@@ -99,8 +100,8 @@ impl Node for Distort {
         self.outputs.all()
     }
 
-    fn render(&self, ui: &mut egui::Ui) -> egui::Response {
-        let _r = ui.horizontal(|ui| {
+    fn render(&self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
             ui.label("Level");
 
             let mut s = self.level.load(std::sync::atomic::Ordering::Relaxed);
@@ -115,7 +116,7 @@ impl Node for Distort {
         let current_mode = self.mode.load(std::sync::atomic::Ordering::Relaxed);
         let mut mode = current_mode;
 
-        let r = egui::ComboBox::from_id_source(("distort", self.id))
+        egui::ComboBox::from_id_source(("distort_mode", self.id))
             .with_label("Mode")
             .selected_text(<&'static str>::from(mode))
             .show_ui(ui, |ui| {
@@ -131,8 +132,6 @@ impl Node for Distort {
         if mode != current_mode {
             self.mode.store(mode, std::sync::atomic::Ordering::Relaxed);
         }
-
-        r.response
     }
 
     fn new(id: NodeId) -> Self {

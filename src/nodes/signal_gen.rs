@@ -1,11 +1,30 @@
 use std::{collections::HashMap, sync::Arc};
 
 use atomig::Atomic;
+use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
 
 use crate::{
     ids::{NodeId, PortId},
     node::*,
 };
+
+#[derive(
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    atomig::Atom,
+    strum::EnumIter,
+    strum::IntoStaticStr,
+    Clone,
+    Copy,
+)]
+#[repr(u8)]
+enum Mode {
+    Sine,
+    Constant,
+}
 
 pub struct SignalGen {
     id: NodeId,
@@ -16,6 +35,8 @@ pub struct SignalGen {
     frequency: Atomic<f32>,
 
     clock: Atomic<f32>,
+
+    mode: Atomic<Mode>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -25,6 +46,8 @@ struct SignalGenConfig {
 
     amplitude: f32,
     frequency: f32,
+
+    mode: Mode,
 }
 
 impl Node for SignalGen {
@@ -50,6 +73,7 @@ impl Node for SignalGen {
             outputs: self.outputs.all().as_ref().clone(),
             amplitude: self.amplitude.load(std::sync::atomic::Ordering::Relaxed),
             frequency: self.frequency.load(std::sync::atomic::Ordering::Relaxed),
+            mode: self.mode.load(atomig::Ordering::Relaxed),
         };
 
         serde_json::to_value(cfg).unwrap()
@@ -68,6 +92,8 @@ impl Node for SignalGen {
         this.frequency
             .store(cfg.frequency, std::sync::atomic::Ordering::Relaxed);
         this.outputs = PortStorage::new(cfg.outputs);
+        this.mode
+            .store(cfg.mode, std::sync::atomic::Ordering::Relaxed);
 
         this
     }
@@ -81,29 +107,27 @@ impl Node for SignalGen {
         self.outputs.all()
     }
 
-    fn render(&self, ui: &mut egui::Ui) -> egui::Response {
-        let _r = ui.horizontal(|ui| {
+    fn render(&self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
             ui.label("Amplitude");
 
             let mut s = self.amplitude.load(std::sync::atomic::Ordering::Relaxed);
 
-            let r = ui.add(egui::Slider::new(&mut s, 0.0..=5.0));
+            let r = ui.add(egui::Slider::new(&mut s, -1.0..=1.0));
 
             if r.changed() {
                 self.amplitude
                     .store(s, std::sync::atomic::Ordering::Relaxed);
             }
-
-            r
         });
 
-        let r = ui.horizontal(|ui| {
+        ui.horizontal(|ui| {
             ui.label("Frequency");
 
             let mut s = self.frequency.load(std::sync::atomic::Ordering::Relaxed);
 
             let r = ui.add(
-                egui::Slider::new(&mut s, 20.0..=20000.0)
+                egui::Slider::new(&mut s, 0.1..=20000.0)
                     .suffix(" hz")
                     .logarithmic(true),
             );
@@ -112,11 +136,27 @@ impl Node for SignalGen {
                 self.frequency
                     .store(s, std::sync::atomic::Ordering::Relaxed);
             }
-
-            r
         });
 
-        r.response
+        let current_mode = self.mode.load(std::sync::atomic::Ordering::Relaxed);
+        let mut mode = current_mode;
+
+        egui::ComboBox::from_id_source(("signal_gen_mode", self.id))
+            .with_label("Mode")
+            .selected_text(<&'static str>::from(mode))
+            .show_ui(ui, |ui| {
+                for possible_mode in Mode::iter() {
+                    ui.selectable_value(
+                        &mut mode,
+                        possible_mode,
+                        <&'static str>::from(possible_mode),
+                    );
+                }
+            });
+
+        if mode != current_mode {
+            self.mode.store(mode, std::sync::atomic::Ordering::Relaxed);
+        }
     }
 
     fn new(id: NodeId) -> Self {
@@ -127,9 +167,38 @@ impl Node for SignalGen {
             amplitude: Atomic::new(0.5),
             frequency: Atomic::new(20.0),
             clock: Atomic::new(0.0),
+            mode: Atomic::new(Mode::Sine),
         };
 
         this
+    }
+}
+
+impl SignalGen {
+    fn do_sine(&self, output: &mut [f32]) {
+        let clock = self.clock.load(std::sync::atomic::Ordering::Relaxed);
+
+        let amplitude = self.amplitude.load(std::sync::atomic::Ordering::Relaxed);
+        let frequency = self.frequency.load(std::sync::atomic::Ordering::Relaxed);
+
+        let sample_rate = 48000.0;
+        let steps_per_sample = std::f32::consts::TAU * frequency / sample_rate;
+
+        self.clock.store(
+            (clock + output.len() as f32) % (std::f32::consts::TAU / steps_per_sample),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+
+
+        for (idx, v) in output.iter_mut().enumerate() {
+            *v = (steps_per_sample * (clock + idx as f32)).sin() * amplitude;
+        }
+    }
+
+    fn do_const(&self, output: &mut [f32]) {
+        let amplitude = self.amplitude.load(std::sync::atomic::Ordering::Relaxed);
+
+        output.fill(amplitude);
     }
 }
 
@@ -142,20 +211,11 @@ impl SimpleNode for SignalGen {
         let output_id = self.outputs.get("out").unwrap();
         let output = outputs.get_mut(&output_id).unwrap();
 
-        let amplitude = self.amplitude.load(std::sync::atomic::Ordering::Relaxed);
-        let frequency = self.frequency.load(std::sync::atomic::Ordering::Relaxed);
-        let clock = self.clock.load(std::sync::atomic::Ordering::Relaxed);
+        let mode = self.mode.load(std::sync::atomic::Ordering::Relaxed);
 
-        let sample_rate = 48000.0;
-        self.clock.store(
-            (clock + output.len() as f32) % sample_rate,
-            std::sync::atomic::Ordering::Relaxed,
-        );
-
-        let steps_per_sample = std::f32::consts::TAU * frequency / sample_rate;
-
-        for (idx, v) in output.iter_mut().enumerate() {
-            *v = (steps_per_sample * (clock + idx as f32)).sin() * amplitude;
+        match mode {
+            Mode::Sine => self.do_sine(output),
+            Mode::Constant => self.do_const(output),
         }
     }
 }

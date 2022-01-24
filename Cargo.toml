@@ -13,7 +13,7 @@ color-eyre = "0.6.0"
 cpal = { version = "0.13.4", features = ["jack"] }
 eframe = { version = "0.16.0", features = ["default_fonts", "egui_glow"], default-features = false }
 egui = "0.16.1"
-egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git" }
+egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "f6af88737e8299b286f606a3fd1c8cb5896bac14" }
 itertools = "0.10.3"
 lazy_static = "1.4.0"
 oneshot = "0.1.3"
@@ -30,6 +30,9 @@ rfd = "0.6.4"
 atomig = { version = "0.3.3", features = ["derive"] }
 strum = { version = "0.23.0", features = ["derive"] }
 audioviz = { version = "0.4.4", default-features = false }
+dasp_envelope = { version = "0.11.0", features = ["peak"] }
+dasp_peak = "0.11.0"
+simple_moving_average = "0.1.2"
 
 [patch.crates-io]
 egui = { git = "https://github.com/simmsb/egui", rev = "17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5" }

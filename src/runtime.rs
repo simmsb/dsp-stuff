@@ -102,7 +102,7 @@ impl UiContext {
         let id = LinkId::generate();
         let inst = LinkInstance::new(id, lhs, rhs);
 
-        tracing::debug!(link = ?inst, "Adding link");
+        tracing::info!(link = ?inst, "Adding link");
 
         self.links.insert(id, inst);
         self.outputs.entry(lhs).or_default().insert(id);
@@ -257,7 +257,7 @@ impl UiContext {
         if let Some(idx) = self.node_ctx.link_destroyed() {
             if let Some(&id) = self.links.keys().nth(idx) {
                 if let Some(inst) = self.links.remove(&id) {
-                    tracing::debug!(link = ?inst, "Removing link");
+                    tracing::info!(link = ?inst, "Removing link");
                     self.outputs.get_mut(&inst.lhs).unwrap().remove(&id);
                     self.inputs.get_mut(&inst.rhs).unwrap().remove(&id);
 
