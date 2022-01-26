@@ -363,19 +363,20 @@ fn do_write_2<T: Sample>(
             && offs >= (buf_len * allowed_latency)
         {
             tracing::debug!("Skipping {} samples so the output catches up", offs);
-            Itertools::intersperse(
-                buf[offs..][..buf_len].iter().map(<T as Sample>::from),
-                <T as Sample>::from(&0.0f32),
-            )
-            .collect_slice(data);
+            buf[offs..][..buf_len]
+                .iter()
+                .interleave(buf[offs..][..buf_len].iter())
+                .map(<T as Sample>::from)
+                .collect_slice(data);
             let len = buf.len();
             source.release(len);
         } else {
-            Itertools::intersperse(
-                buf[..buf_len].iter().map(<T as Sample>::from),
-                <T as Sample>::from(&0.0f32),
-            )
-            .collect_slice(data);
+            buf[..buf_len]
+                .iter()
+                .interleave(buf[..buf_len].iter())
+                .map(<T as Sample>::from)
+                .collect_slice(data);
+
             source.release(buf_len);
         }
     } else {

@@ -71,8 +71,7 @@ impl Node for Multiply {
         self.outputs.all()
     }
 
-    fn render(&self, _ui: &mut egui::Ui) {
-    }
+    fn render(&self, _ui: &mut egui::Ui) {}
 
     fn new(id: NodeId) -> Self {
         let this = Self {

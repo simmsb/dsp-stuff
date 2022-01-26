@@ -90,7 +90,8 @@ impl Node for Chebyshev {
             let r = ui.add(egui::Slider::new(&mut s, 0.0..=50.0));
 
             if r.changed() {
-                self.level_pos.store(s, std::sync::atomic::Ordering::Relaxed);
+                self.level_pos
+                    .store(s, std::sync::atomic::Ordering::Relaxed);
             }
         });
 
@@ -102,7 +103,8 @@ impl Node for Chebyshev {
             let r = ui.add(egui::Slider::new(&mut s, 0.0..=50.0));
 
             if r.changed() {
-                self.level_neg.store(s, std::sync::atomic::Ordering::Relaxed);
+                self.level_neg
+                    .store(s, std::sync::atomic::Ordering::Relaxed);
             }
         });
     }

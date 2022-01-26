@@ -52,13 +52,14 @@ impl Node for Gain {
 
     fn restore(value: serde_json::Value) -> Self
     where
-        Self: Sized {
-
+        Self: Sized,
+    {
         let cfg: GainConfig = serde_json::from_value(value).unwrap();
 
         let mut this = Self::new(cfg.id);
 
-        this.level.store(cfg.level, std::sync::atomic::Ordering::Relaxed);
+        this.level
+            .store(cfg.level, std::sync::atomic::Ordering::Relaxed);
         this.inputs = PortStorage::new(cfg.inputs);
         this.outputs = PortStorage::new(cfg.outputs);
 

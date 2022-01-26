@@ -83,7 +83,8 @@ impl Node for Distort {
 
         this.level
             .store(cfg.level, std::sync::atomic::Ordering::Relaxed);
-        this.mode.store(cfg.mode, std::sync::atomic::Ordering::Relaxed);
+        this.mode
+            .store(cfg.mode, std::sync::atomic::Ordering::Relaxed);
         this.inputs = PortStorage::new(cfg.inputs);
         this.outputs = PortStorage::new(cfg.outputs);
 

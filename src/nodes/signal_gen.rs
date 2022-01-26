@@ -189,7 +189,6 @@ impl SignalGen {
             std::sync::atomic::Ordering::Relaxed,
         );
 
-
         for (idx, v) in output.iter_mut().enumerate() {
             *v = (steps_per_sample * (clock + idx as f32)).sin() * amplitude;
         }
