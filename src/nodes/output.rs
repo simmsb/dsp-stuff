@@ -189,7 +189,7 @@ impl Node for Output {
             .hosts()
             .unwrap();
         let selected_host = *hosts.first().expect("There are no audio hosts available");
-        let devices = devices::invoke(devices::DeviceCommand::ListInputs(selected_host))
+        let devices = devices::invoke(devices::DeviceCommand::ListOutputs(selected_host))
             .devices()
             .unwrap();
 
