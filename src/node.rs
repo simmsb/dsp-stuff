@@ -30,7 +30,7 @@ impl PortStorage {
     }
 
     pub fn get(&self, name: &str) -> Option<PortId> {
-        self.0.load().get(name).cloned()
+        self.0.load().get(name).copied()
     }
 
     pub fn all(&self) -> Arc<HashMap<String, PortId>> {

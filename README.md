@@ -7,7 +7,8 @@ A node based audio effects thing.
 
 # Usage
 
-Run with `cargo run --release`
+Run with `cargo run --release --features gpl_effects` (customize the feature
+flags as you wish)
 
 If you're using pipewire, you can set the `PIPEWIRE_LATENCY` env var to force
 pipewire to give us the lowest latency possible, for example:
@@ -16,6 +17,12 @@ pipewire to give us the lowest latency possible, for example:
 env PIPEWIRE_LATENCY=128/48000 cargo run --release
 ```
 
+## Feature flags
+
+- `gpl_effects`: Enables building with effects that are gpl licensed. (note:
+  this will make the built binary gpl licensed)
+- `windows`: Enables building cpal with ASIO support
+- `console`: Enables the tokio console subscriber
 
 ## Plumbing
 

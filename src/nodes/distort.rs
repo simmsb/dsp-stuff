@@ -168,7 +168,7 @@ fn do_soft_clip(sample: f32, level: f32) -> f32 {
 fn soft_clip(input: &[f32], output: &mut [f32], level: f32) {
     input
         .iter()
-        .cloned()
+        .copied()
         .map(|x| do_soft_clip(x, level))
         .collect_slice(output);
 }
@@ -186,7 +186,7 @@ fn do_recip_soft_clip(sample: f32, level: f32) -> f32 {
 fn recip_soft_clip(input: &[f32], output: &mut [f32], level: f32) {
     input
         .iter()
-        .cloned()
+        .copied()
         .map(|x| do_recip_soft_clip(x, level))
         .collect_slice(output);
 }
@@ -202,7 +202,7 @@ fn do_tanh(sample: f32, level: f32) -> f32 {
 fn tanh(input: &[f32], output: &mut [f32], level: f32) {
     input
         .iter()
-        .cloned()
+        .copied()
         .map(|x| do_tanh(x, level))
         .collect_slice(output);
 }

@@ -141,7 +141,7 @@ fn do_tanh(sample: f32, level_pos: f32, level_neg: f32) -> f32 {
 fn tanh(input: &[f32], output: &mut [f32], level_pos: f32, level_neg: f32) {
     input
         .iter()
-        .cloned()
+        .copied()
         .map(|x| do_tanh(x, level_pos, level_neg))
         .collect_slice(output);
 }

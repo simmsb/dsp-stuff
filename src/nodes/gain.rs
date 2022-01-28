@@ -115,7 +115,7 @@ impl SimpleNode for Gain {
             .get(&input_id)
             .unwrap()
             .iter()
-            .cloned()
+            .copied()
             .map(|x| x * level)
             .collect_slice(outputs.get_mut(&output_id).unwrap());
     }
