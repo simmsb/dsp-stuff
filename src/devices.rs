@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{atomic::AtomicU8, Arc},
 };
 
 use collect_slice::CollectSlice;
@@ -24,7 +24,7 @@ lazy_static::lazy_static! {
 
         std::thread::spawn(move || {
             let mut devices: HashMap<DeviceId, cpal::Stream> = HashMap::new();
-            let mut resync_flags: HashMap<DeviceId, Arc<AtomicBool>> = HashMap::new();
+            let mut resync_counters: HashMap<DeviceId, Arc<AtomicU8>> = HashMap::new();
 
             for (cmd, resp_chan) in receiver {
                 match cmd {
@@ -102,7 +102,7 @@ lazy_static::lazy_static! {
                                 stream.play().unwrap();
                                 let id = DeviceId::generate();
                                 devices.insert(id, stream);
-                                resync_flags.insert(id, resync);
+                                resync_counters.insert(id, resync);
 
                                 Some((id, sink))
                             },
@@ -124,8 +124,8 @@ lazy_static::lazy_static! {
                         resp_chan.send(DeviceResponse::DeviceClosed).unwrap();
                     },
                     DeviceCommand::TriggerResync => {
-                        for flag in resync_flags.values() {
-                            flag.store(true, std::sync::atomic::Ordering::Relaxed);
+                        for counter in resync_counters.values() {
+                            counter.fetch_add(5, std::sync::atomic::Ordering::Relaxed);
                         }
 
                         resp_chan.send(DeviceResponse::Resynced).unwrap();
@@ -312,7 +312,7 @@ fn input_stream(
 fn do_write_1<T: Sample>(
     data: &mut [T],
     source: &mut splittable::View<Source<f32>>,
-    trigger_catchup: &mut Arc<AtomicBool>,
+    trigger_catchup: &mut Arc<AtomicU8>,
 ) {
     if source.try_grant(data.len()).unwrap() {
         let buf = source.view();
@@ -321,7 +321,7 @@ fn do_write_1<T: Sample>(
 
         let allowed_latency = 2;
 
-        if trigger_catchup.swap(false, std::sync::atomic::Ordering::Relaxed)
+        if (trigger_catchup.fetch_sub(1, std::sync::atomic::Ordering::Relaxed) > 0)
             && offs >= (data.len() * allowed_latency)
         {
             tracing::debug!("Skipping {} samples so the output catches up", offs);
@@ -348,7 +348,7 @@ fn do_write_1<T: Sample>(
 fn do_write_2<T: Sample>(
     data: &mut [T],
     source: &mut splittable::View<Source<f32>>,
-    trigger_catchup: &mut Arc<AtomicBool>,
+    trigger_catchup: &mut Arc<AtomicU8>,
 ) {
     let buf_len = data.len() / 2;
 
@@ -359,7 +359,7 @@ fn do_write_2<T: Sample>(
 
         let allowed_latency = 2;
 
-        if trigger_catchup.swap(false, std::sync::atomic::Ordering::Relaxed)
+        if (trigger_catchup.fetch_sub(1, std::sync::atomic::Ordering::Relaxed) > 0)
             && offs >= (buf_len * allowed_latency)
         {
             tracing::debug!("Skipping {} samples so the output catches up", offs);
@@ -388,7 +388,7 @@ fn do_write_2<T: Sample>(
 
 fn output_stream(
     dev: cpal::Device,
-) -> color_eyre::Result<(cpal::Stream, Sink<f32>, Arc<AtomicBool>)> {
+) -> color_eyre::Result<(cpal::Stream, Sink<f32>, Arc<AtomicU8>)> {
     let (cfg, fmt) = if let Some(cfg) = dev
         .supported_output_configs()?
         .filter(|cfg| {
@@ -421,7 +421,7 @@ fn output_stream(
 
     let err_cb = |err| tracing::warn!("output message: {:#?}", err);
 
-    let mut trigger_catchup = Arc::new(AtomicBool::new(false));
+    let mut trigger_catchup = Arc::new(AtomicU8::new(0));
     let trigger_catchup_out = Arc::clone(&trigger_catchup);
 
     let stream = match cfg.channels {
