@@ -989,7 +989,7 @@ dependencies = [
 [[package]]
 name = "dsp-stuff-gpl"
 version = "0.1.0"
-source = "git+https://github.com/simmsb/dsp-stuff-gpl.git?rev=2b4d25bb44aec449de7560747f58410741f997ff#2b4d25bb44aec449de7560747f58410741f997ff"
+source = "git+https://github.com/simmsb/dsp-stuff-gpl.git?rev=170f1680a08fd41379aa49bf88a1e4553d50929c#170f1680a08fd41379aa49bf88a1e4553d50929c"
 dependencies = [
  "collect_slice",
  "dasp_interpolate",

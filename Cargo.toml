@@ -33,7 +33,7 @@ audioviz = { version = "0.4.4", default-features = false }
 dasp_envelope = { version = "0.11.0", features = ["peak"] }
 dasp_peak = "0.11.0"
 simple_moving_average = "0.1.2"
-dsp-stuff-gpl = { git = "https://github.com/simmsb/dsp-stuff-gpl.git", optional = true, rev = "2b4d25bb44aec449de7560747f58410741f997ff" }
+dsp-stuff-gpl = { git = "https://github.com/simmsb/dsp-stuff-gpl.git", optional = true, rev = "170f1680a08fd41379aa49bf88a1e4553d50929c" }
 
 [patch.crates-io]
 egui = { git = "https://github.com/simmsb/egui", rev = "17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5" }

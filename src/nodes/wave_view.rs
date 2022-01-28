@@ -129,6 +129,8 @@ impl Node for WaveView {
             ui.painter().extend(vec![line]);
         });
 
+        ui.label(format!("Samples per frame: {}", samples_this_render));
+
         source.release(samples_this_render);
     }
 
