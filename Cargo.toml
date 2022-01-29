@@ -13,7 +13,8 @@ color-eyre = "0.6.0"
 cpal = { version = "0.13.5", features = ["jack"] }
 eframe = { version = "0.16.0", features = ["default_fonts", "egui_glow"], default-features = false }
 egui = "0.16.1"
-egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "f6af88737e8299b286f606a3fd1c8cb5896bac14" }
+egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "b09eca2208e8fef9c43daea38be4e1db44405841" }
+#egui_nodes = { path = "/home/ben/dev/egui_nodes" }
 itertools = "0.10.3"
 lazy_static = "1.4.0"
 oneshot = "0.1.3"

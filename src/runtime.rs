@@ -190,13 +190,13 @@ impl UiContext {
 
         let nodes_to_delete = Rc::new(RefCell::new(Vec::new()));
 
-        let nodes = self
+        let nodes: Vec<NodeConstructor> = self
             .nodes
             .values()
             .map(|node| {
                 let nodes_to_delete = Rc::clone(&nodes_to_delete);
-                let mut n = NodeConstructor::new(node.id.get(), NodeArgs::default())
-                    .with_title(move |ui| {
+                let mut n = NodeConstructor::new(node.id.get(), NodeArgs::default());
+                n.with_title(move |ui| {
                         ui.horizontal(|ui| {
                             ui.label(format!("{} ({})", node.instance.title(), node.id.get()))
                                 .on_hover_text(node.instance.description());
@@ -219,7 +219,7 @@ impl UiContext {
                     .iter()
                     .map(|(k, v)| (k.to_owned(), *v))
                 {
-                    n = n.with_input_attribute(id.get(), PinArgs::default(), move |ui| {
+                    n.with_input_attribute(id.get(), PinArgs::default(), move |ui| {
                         ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
                             ui.label(input)
                         })
@@ -233,7 +233,7 @@ impl UiContext {
                     .iter()
                     .map(|(k, v)| (k.to_owned(), *v))
                 {
-                    n = n.with_output_attribute(id.get(), PinArgs::default(), move |ui| {
+                    n.with_output_attribute(id.get(), PinArgs::default(), move |ui| {
                         ui.with_layout(egui::Layout::top_down(egui::Align::RIGHT), |ui| {
                             ui.label(output)
                         })

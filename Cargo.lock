@@ -1055,7 +1055,7 @@ dependencies = [
 [[package]]
 name = "egui_nodes"
 version = "0.1.4"
-source = "git+https://github.com/simmsb/egui_nodes.git?rev=f6af88737e8299b286f606a3fd1c8cb5896bac14#f6af88737e8299b286f606a3fd1c8cb5896bac14"
+source = "git+https://github.com/simmsb/egui_nodes.git?rev=b09eca2208e8fef9c43daea38be4e1db44405841#b09eca2208e8fef9c43daea38be4e1db44405841"
 dependencies = [
  "derivative",
  "egui",
