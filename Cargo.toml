@@ -13,16 +13,16 @@ color-eyre = "0.6.0"
 cpal = { version = "0.13.5", features = ["jack"] }
 eframe = { version = "0.16.0", features = ["default_fonts", "egui_glow"], default-features = false }
 egui = "0.16.1"
-egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "b09eca2208e8fef9c43daea38be4e1db44405841" }
+egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "59417d6b3a56983fcef439d4a8bf3f6dc4599d42" }
 #egui_nodes = { path = "/home/ben/dev/egui_nodes" }
 itertools = "0.10.3"
 lazy_static = "1.4.0"
 oneshot = "0.1.3"
 rivulet = { git = "https://github.com/simmsb/rivulet", rev = "b2416e5e7eb87162d693c74ed62df33e252e9647" }
 tokio = { version = "1.16.1", features = ["rt", "time", "macros", "rt-multi-thread", "tracing", "sync"] }
-tracing = "0.1.29"
+tracing = "0.1.30"
 tracing-error = "0.2.0"
-tracing-subscriber = { version = "0.3.7", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.8", features = ["env-filter"] }
 console-subscriber = { version = "0.1.1", optional = true }
 derivative = "2.2.0"
 serde = { version = "1.0.136", features = ["derive", "rc"] }
@@ -37,10 +37,10 @@ simple_moving_average = "0.1.2"
 dsp-stuff-gpl = { git = "https://github.com/simmsb/dsp-stuff-gpl.git", optional = true, rev = "170f1680a08fd41379aa49bf88a1e4553d50929c" }
 
 [patch.crates-io]
-egui = { git = "https://github.com/simmsb/egui", rev = "17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5" }
-eframe = { git = "https://github.com/simmsb/egui", rev = "17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5" }
-epi = { git = "https://github.com/simmsb/egui", rev = "17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5" }
-egui_glow = { git = "https://github.com/simmsb/egui", rev = "17b0fa77a1f6100b3e5f8ac441a5964a49ad68f5" }
+egui = { git = "https://github.com/simmsb/egui", rev = "e4e183e7526f2d29e4af316425afd73d2f7e8bb8" }
+eframe = { git = "https://github.com/simmsb/egui", rev = "e4e183e7526f2d29e4af316425afd73d2f7e8bb8" }
+epi = { git = "https://github.com/simmsb/egui", rev = "e4e183e7526f2d29e4af316425afd73d2f7e8bb8" }
+egui_glow = { git = "https://github.com/simmsb/egui", rev = "e4e183e7526f2d29e4af316425afd73d2f7e8bb8" }
 
 [features]
 gpl_effects = ["dsp-stuff-gpl"]

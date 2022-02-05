@@ -197,21 +197,21 @@ impl UiContext {
                 let nodes_to_delete = Rc::clone(&nodes_to_delete);
                 let mut n = NodeConstructor::new(node.id.get(), NodeArgs::default());
                 n.with_title(move |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(format!("{} ({})", node.instance.title(), node.id.get()))
-                                .on_hover_text(node.instance.description());
-                            ui.with_layout(egui::Layout::right_to_left(), move |ui| {
-                                let button = egui::Button::new("Close")
-                                    .with_id((node.id.get(), "node_close"));
-                                if button.ui(ui).clicked() {
-                                    nodes_to_delete.borrow_mut().push(node.id);
-                                }
-                            })
+                    ui.horizontal(|ui| {
+                        ui.label(format!("{} ({})", node.instance.title(), node.id.get()))
+                            .on_hover_text_at_pointer(node.instance.description());
+                        ui.with_layout(egui::Layout::right_to_left(), move |ui| {
+                            let button =
+                                egui::Button::new("Close").with_id((node.id.get(), "node_close"));
+                            if button.ui(ui).clicked() {
+                                nodes_to_delete.borrow_mut().push(node.id);
+                            }
                         })
-                        .response
                     })
-                    .with_content(|ui| node.instance.render(ui))
-                    .with_origin(node.position);
+                    .response
+                })
+                .with_content(|ui| node.instance.render(ui))
+                .with_origin(node.position);
 
                 for (input, id) in node
                     .instance
@@ -378,14 +378,14 @@ impl eframe::epi::App for UiContext {
         "DSP Stuff"
     }
 
-    fn update(&mut self, ctx: &egui::CtxRef, frame: &eframe::epi::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &eframe::epi::Frame) {
         let mut visuals = if self.theme.dark {
             Visuals::dark()
         } else {
             Visuals::light()
         };
 
-        visuals.window_corner_radius = 3.0;
+        visuals.window_corner_radius = egui::Rounding::from(3.0);
         visuals.override_text_color = Some(self.theme.text);
         visuals.widgets.active.bg_fill = self.theme.node_background;
         visuals.widgets.hovered.bg_fill = self.theme.node_background_hovered;
@@ -446,7 +446,7 @@ impl eframe::epi::App for UiContext {
 
                 if ui
                     .button("Sync output")
-                    .on_hover_text("Flush buffers to get rid of any built up latency")
+                    .on_hover_text_at_pointer("Flush buffers to get rid of any built up latency")
                     .clicked()
                 {
                     devices::invoke(devices::DeviceCommand::TriggerResync);
