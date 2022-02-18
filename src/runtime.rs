@@ -110,8 +110,6 @@ impl UiContext {
     }
 
     fn update_all(&mut self) {
-        let _guard = self.runtime.enter();
-
         let calculated = self
             .nodes
             .values()
@@ -129,8 +127,6 @@ impl UiContext {
     }
 
     fn restart_node(&mut self, node: NodeId) {
-        let _guard = self.runtime.enter();
-
         let inputs = self.compute_inputs_for(node);
         let outpus = self.compute_outputs_for(node);
         self.nodes.get_mut(&node).unwrap().restart(inputs, outpus);
@@ -300,7 +296,6 @@ impl UiContext {
         for node_to_delete in nodes_to_delete.borrow().iter() {
             tracing::info!("Deleting node {:?}", node_to_delete);
             if let Some(n) = self.nodes.get_mut(node_to_delete) {
-                let _guard = self.runtime.enter();
                 n.stop();
             }
 
@@ -379,6 +374,8 @@ impl eframe::epi::App for UiContext {
     }
 
     fn update(&mut self, ctx: &egui::Context, frame: &eframe::epi::Frame) {
+        let _guard = self.runtime.enter();
+
         let mut visuals = if self.theme.dark {
             Visuals::dark()
         } else {

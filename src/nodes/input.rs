@@ -131,6 +131,7 @@ impl Node for Input {
         this
     }
 
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn render(&self, ui: &mut egui::Ui) {
         let current_host = **self.selected_host.load();
         let mut selected_host = current_host;
@@ -210,6 +211,7 @@ impl Node for Input {
 
 #[async_trait::async_trait]
 impl Perform for Input {
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     async fn perform(&self, _inputs: NodeInputs<'_, '_, '_>, outputs: NodeOutputs<'_, '_, '_>) {
         let buf_size = 128;
 

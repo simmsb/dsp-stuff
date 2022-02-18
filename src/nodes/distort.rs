@@ -101,6 +101,7 @@ impl Node for Distort {
         self.outputs.all()
     }
 
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn render(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Level");
@@ -208,6 +209,7 @@ fn tanh(input: &[f32], output: &mut [f32], level: f32) {
 }
 
 impl SimpleNode for Distort {
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
         let level = self.level.load(std::sync::atomic::Ordering::Relaxed);
 

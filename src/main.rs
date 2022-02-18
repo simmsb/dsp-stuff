@@ -5,6 +5,7 @@ mod nodes;
 mod runtime;
 mod theme;
 
+//fn install_tracing() -> color_eyre::Result<Box<dyn Any>> {
 fn install_tracing() -> color_eyre::Result<()> {
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
@@ -31,18 +32,26 @@ fn install_tracing() -> color_eyre::Result<()> {
                     .add_directive("dsp_stuff=info".parse().unwrap())
             });
 
+        // let (flame_layer, guard) =
+        // tracing_flame::FlameLayer::with_file("./tracing.folded").unwrap();
+
         tracing_subscriber::registry()
             .with(filter_layer)
             .with(tracing_error::ErrorLayer::default())
             .with(fmt_layer)
+            // .with(flame_layer)
             .init();
+
+        // return Ok(Box::new(guard));
     }
 
+    
     Ok(())
+    //Ok(Box::new(()))
 }
 
 fn main() -> color_eyre::Result<()> {
-    install_tracing()?;
+    let _guard = install_tracing()?;
 
     color_eyre::install()?;
 

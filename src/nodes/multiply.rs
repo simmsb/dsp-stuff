@@ -85,6 +85,7 @@ impl Node for Multiply {
 }
 
 impl SimpleNode for Multiply {
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
         let input_a_id = self.inputs.get("a").unwrap();
         let input_b_id = self.inputs.get("b").unwrap();

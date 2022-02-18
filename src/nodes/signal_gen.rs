@@ -107,6 +107,7 @@ impl Node for SignalGen {
         self.outputs.all()
     }
 
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn render(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Amplitude");
@@ -175,6 +176,7 @@ impl Node for SignalGen {
 }
 
 impl SignalGen {
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn do_sine(&self, output: &mut [f32]) {
         let clock = self.clock.load(std::sync::atomic::Ordering::Relaxed);
 
@@ -194,6 +196,7 @@ impl SignalGen {
         }
     }
 
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn do_const(&self, output: &mut [f32]) {
         let amplitude = self.amplitude.load(std::sync::atomic::Ordering::Relaxed);
 
@@ -202,6 +205,7 @@ impl SignalGen {
 }
 
 impl SimpleNode for SignalGen {
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(
         &self,
         _inputs: &HashMap<PortId, &[f32]>,

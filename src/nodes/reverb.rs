@@ -107,6 +107,7 @@ impl Node for Reverb {
         this
     }
 
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn render(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Delay (s)");
@@ -152,6 +153,7 @@ impl Node for Reverb {
 }
 
 impl SimpleNode for Reverb {
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
         let input_id = self.inputs.get("in").unwrap();
         let input = inputs.get(&input_id).unwrap();

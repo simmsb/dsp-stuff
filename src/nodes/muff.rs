@@ -91,6 +91,7 @@ impl Node for Muff {
         self.outputs.all()
     }
 
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn render(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Toan");
@@ -151,6 +152,7 @@ impl Node for Muff {
 }
 
 impl SimpleNode for Muff {
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
         let toan = self.toan.load(std::sync::atomic::Ordering::Relaxed);
         let level = self.level.load(std::sync::atomic::Ordering::Relaxed);

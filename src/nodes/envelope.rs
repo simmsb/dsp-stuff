@@ -87,6 +87,7 @@ impl Node for Envelope {
         self.outputs.all()
     }
 
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn render(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Attack");
@@ -128,6 +129,7 @@ impl Node for Envelope {
 }
 
 impl SimpleNode for Envelope {
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
         let attack = self.attack.load(std::sync::atomic::Ordering::Relaxed);
         let release = self.release.load(std::sync::atomic::Ordering::Relaxed);

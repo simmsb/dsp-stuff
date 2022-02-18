@@ -79,6 +79,7 @@ impl Node for WaveView {
         this
     }
 
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn render(&self, ui: &mut egui::Ui) {
         let mut source = self.view_source.lock().unwrap();
         // we need to do this so the source updates itself
@@ -152,6 +153,7 @@ impl Node for WaveView {
 }
 
 impl SimpleNode for WaveView {
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(
         &self,
         inputs: &HashMap<PortId, &[f32]>,

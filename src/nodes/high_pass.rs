@@ -76,6 +76,7 @@ impl Node for HighPass {
         self.outputs.all()
     }
 
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn render(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Level");
@@ -106,6 +107,7 @@ impl Node for HighPass {
 }
 
 impl SimpleNode for HighPass {
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
         let ratio = self.ratio.load(std::sync::atomic::Ordering::Relaxed);
 

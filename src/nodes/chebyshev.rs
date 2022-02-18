@@ -81,6 +81,7 @@ impl Node for Chebyshev {
         self.outputs.all()
     }
 
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn render(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Level (pos)");
@@ -147,6 +148,7 @@ fn tanh(input: &[f32], output: &mut [f32], level_pos: f32, level_neg: f32) {
 }
 
 impl SimpleNode for Chebyshev {
+    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
         let level_pos = self.level_pos.load(std::sync::atomic::Ordering::Relaxed);
         let level_neg = self.level_neg.load(std::sync::atomic::Ordering::Relaxed);
