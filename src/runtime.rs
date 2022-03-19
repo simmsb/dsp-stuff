@@ -4,7 +4,9 @@ use crate::{
     node::Perform,
     nodes,
     theme::{self, Theme},
+    Params,
 };
+use eframe::CreationContext;
 use egui::{pos2, Visuals, Widget};
 use egui_nodes::{AttributeFlags, ColorStyle, LinkArgs, NodeArgs, NodeConstructor, PinArgs};
 use itertools::Itertools;
@@ -45,7 +47,7 @@ struct DSPConfig {
 }
 
 impl UiContext {
-    pub fn new() -> Self {
+    pub fn new(cc: &CreationContext, params: &Params) -> Self {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .thread_name("dsp-runtime-worker")
             .build()
@@ -65,6 +67,18 @@ impl UiContext {
         };
 
         this.update_theme(&theme::MONOKAI);
+
+        if let Some(s) = cc.storage {
+            if !params.clean {
+                if let Some(cfg) = s
+                    .get_string("graph_state")
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                {
+                    let _guard = this.runtime.enter();
+                    this.restore_config(cfg);
+                }
+            }
+        }
 
         this
     }
@@ -193,15 +207,16 @@ impl UiContext {
                 let nodes_to_delete = Rc::clone(&nodes_to_delete);
                 let mut n = NodeConstructor::new(node.id.get(), NodeArgs::default());
                 n.with_title(move |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(format!("{} ({})", node.instance.title(), node.id.get()))
-                            .on_hover_text_at_pointer(node.instance.description());
-                        ui.with_layout(egui::Layout::right_to_left(), move |ui| {
-                            let button =
-                                egui::Button::new("Close").with_id((node.id.get(), "node_close"));
-                            if button.ui(ui).clicked() {
-                                nodes_to_delete.borrow_mut().push(node.id);
-                            }
+                    ui.push_id((node.id, "title"), |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{} ({})", node.instance.title(), node.id.get()))
+                                .on_hover_text_at_pointer(node.instance.description());
+                            ui.with_layout(egui::Layout::right_to_left(), move |ui| {
+                                let button = egui::Button::new("Close");
+                                if button.ui(ui).clicked() {
+                                    nodes_to_delete.borrow_mut().push(node.id);
+                                }
+                            })
                         })
                     })
                     .response
@@ -369,10 +384,6 @@ impl UiContext {
 }
 
 impl eframe::epi::App for UiContext {
-    fn name(&self) -> &str {
-        "DSP Stuff"
-    }
-
     fn update(&mut self, ctx: &egui::Context, frame: &eframe::epi::Frame) {
         let _guard = self.runtime.enter();
 
@@ -382,7 +393,7 @@ impl eframe::epi::App for UiContext {
             Visuals::light()
         };
 
-        visuals.window_corner_radius = egui::Rounding::from(3.0);
+        visuals.window_rounding = egui::Rounding::from(3.0);
         visuals.override_text_color = Some(self.theme.text);
         visuals.widgets.active.bg_fill = self.theme.node_background;
         visuals.widgets.hovered.bg_fill = self.theme.node_background_hovered;
@@ -456,6 +467,11 @@ impl eframe::epi::App for UiContext {
         });
 
         frame.set_window_size(ctx.used_size());
+    }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        let cfg = serde_json::to_string(&self.save_config()).unwrap();
+        storage.set_string("graph_state", cfg);
     }
 }
 

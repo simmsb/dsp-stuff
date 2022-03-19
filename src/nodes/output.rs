@@ -138,8 +138,7 @@ impl Node for Output {
         let current_host = **self.selected_host.load();
         let mut selected_host = current_host;
 
-        egui::ComboBox::from_id_source(("host", self.id))
-            .with_label("Audio host")
+        egui::ComboBox::new(("host", self.id), "Audio host")
             .selected_text(selected_host.name())
             .show_ui(ui, |ui| {
                 for host in self.cached_hosts.load().iter() {
@@ -164,7 +163,7 @@ impl Node for Output {
             .map_or((None, None), |(dev, id)| (Some(dev), Some(id)));
         let mut selected_device = current_device.clone();
 
-        let mut cb = egui::ComboBox::from_id_source(("device", self.id)).with_label("Device");
+        let mut cb = egui::ComboBox::new(("device", self.id), "Device");
 
         if let Some(d) = &current_device {
             cb = cb.selected_text(d);

@@ -1,9 +1,18 @@
+use clap::Parser;
+
 mod devices;
 mod ids;
 mod node;
 mod nodes;
 mod runtime;
 mod theme;
+
+#[derive(Parser)]
+pub struct Params {
+    /// Start up with a clean state
+    #[clap(short, long)]
+    clean: bool,
+}
 
 //fn install_tracing() -> color_eyre::Result<Box<dyn Any>> {
 fn install_tracing() -> color_eyre::Result<()> {
@@ -45,17 +54,22 @@ fn install_tracing() -> color_eyre::Result<()> {
         // return Ok(Box::new(guard));
     }
 
-    
     Ok(())
     //Ok(Box::new(()))
 }
 
 fn main() -> color_eyre::Result<()> {
+    let params = Params::parse();
+
     let _guard = install_tracing()?;
 
     color_eyre::install()?;
 
-    let app = runtime::UiContext::new();
+    let options = eframe::NativeOptions::default();
 
-    eframe::run_native(Box::new(app), eframe::NativeOptions::default());
+    eframe::run_native(
+        "DSP Stuff",
+        options,
+        Box::new(move |cc| Box::new(runtime::UiContext::new(cc, &params))),
+    );
 }

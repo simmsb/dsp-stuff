@@ -142,8 +142,7 @@ impl Node for SignalGen {
         let current_mode = self.mode.load(std::sync::atomic::Ordering::Relaxed);
         let mut mode = current_mode;
 
-        egui::ComboBox::from_id_source(("signal_gen_mode", self.id))
-            .with_label("Mode")
+        egui::ComboBox::new(("signal_gen_mode", self.id), "Mode")
             .selected_text(<&'static str>::from(mode))
             .show_ui(ui, |ui| {
                 for possible_mode in Mode::iter() {
