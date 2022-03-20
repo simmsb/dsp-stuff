@@ -39,9 +39,9 @@ clap = { version = "3.1.6", features = ["derive"] }
 #native_helper = { git = "https://github.com/emilk/websocket_experiment.git" }
 
 [patch.crates-io]
-egui = { git = "https://github.com/emilk/egui", rev = "c8371f92c0e3820b833cc917e8f333c08364ebd3" }
-egui_glow = { git = "https://github.com/emilk/egui", rev = "c8371f92c0e3820b833cc917e8f333c08364ebd3" }
-eframe = { git = "https://github.com/emilk/egui", rev = "c8371f92c0e3820b833cc917e8f333c08364ebd3" }
+egui = { git = "https://github.com/emilk/egui", rev = "465c96122cf6aea72e7fbd8d6e7c2c048e88424f" }
+egui_glow = { git = "https://github.com/emilk/egui", rev = "465c96122cf6aea72e7fbd8d6e7c2c048e88424f" }
+eframe = { git = "https://github.com/emilk/egui", rev = "465c96122cf6aea72e7fbd8d6e7c2c048e88424f" }
 
 [features]
 gpl_effects = ["dsp-stuff-gpl"]

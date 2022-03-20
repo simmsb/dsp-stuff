@@ -7,7 +7,7 @@ use crate::{
     Params,
 };
 use eframe::CreationContext;
-use egui::{pos2, Visuals, Widget};
+use egui::{pos2, Visuals};
 use egui_nodes::{AttributeFlags, ColorStyle, LinkArgs, NodeArgs, NodeConstructor, PinArgs};
 use itertools::Itertools;
 use rivulet::{
@@ -207,16 +207,20 @@ impl UiContext {
                 let nodes_to_delete = Rc::clone(&nodes_to_delete);
                 let mut n = NodeConstructor::new(node.id.get(), NodeArgs::default());
                 n.with_title(move |ui| {
-                    ui.push_id((node.id, "title"), |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(format!("{} ({})", node.instance.title(), node.id.get()))
-                                .on_hover_text_at_pointer(node.instance.description());
-                            ui.with_layout(egui::Layout::right_to_left(), move |ui| {
-                                let button = egui::Button::new("Close");
-                                if button.ui(ui).clicked() {
-                                    nodes_to_delete.borrow_mut().push(node.id);
-                                }
-                            })
+                    ui.horizontal(|ui| {
+                        let mut inner_ui = egui::Ui::new(
+                            ui.ctx().clone(),
+                            ui.layer_id(),
+                            egui::Id::new((node.id, "title")),
+                            ui.max_rect(),
+                            ui.clip_rect(),
+                        );
+                        ui.label(format!("{} ({})", node.instance.title(), node.id.get()))
+                            .on_hover_text_at_pointer(node.instance.description());
+                        inner_ui.with_layout(egui::Layout::right_to_left(), move |ui| {
+                            if ui.add(egui::Button::new("Close")).clicked() {
+                                nodes_to_delete.borrow_mut().push(node.id);
+                            }
                         })
                     })
                     .response
@@ -254,6 +258,7 @@ impl UiContext {
 
                 n
             })
+            .sorted_by_key(|n| n.id())
             .collect_vec();
 
         let links = self
