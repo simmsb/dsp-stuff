@@ -237,6 +237,9 @@ impl Perform for Output {
             // tracing::debug!("Releasing inputs");
             for input in inputs.values_mut() {
                 for in_ in input.iter_mut() {
+                    if in_.view().len() < buf_size {
+                        continue;
+                    }
                     in_.release(buf_size);
                 }
             }

@@ -183,15 +183,16 @@ impl SignalGen {
         let frequency = self.frequency.load(std::sync::atomic::Ordering::Relaxed);
 
         let sample_rate = 48000.0;
-        let steps_per_sample = std::f32::consts::TAU * frequency / sample_rate;
+        let steps_per_sample = frequency / sample_rate;
 
         self.clock.store(
-            (clock + output.len() as f32) % (std::f32::consts::TAU / steps_per_sample),
+            (clock + output.len() as f32 * steps_per_sample) % 1.0,
             std::sync::atomic::Ordering::Relaxed,
         );
 
         for (idx, v) in output.iter_mut().enumerate() {
-            *v = (steps_per_sample * (clock + idx as f32)).sin() * amplitude;
+            *v =
+                ((clock + steps_per_sample * idx as f32) * std::f32::consts::TAU).sin() * amplitude;
         }
     }
 

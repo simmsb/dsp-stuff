@@ -321,7 +321,14 @@ fn do_write_1<T: Sample>(
 
         let allowed_latency = 2;
 
-        if (trigger_catchup.fetch_sub(1, std::sync::atomic::Ordering::Relaxed) > 0)
+        if (trigger_catchup
+            .fetch_update(
+                atomig::Ordering::SeqCst,
+                std::sync::atomic::Ordering::SeqCst,
+                |x| Some(x.saturating_sub(1)),
+            )
+            .unwrap()
+            > 0)
             && offs >= (data.len() * allowed_latency)
         {
             tracing::debug!("Skipping {} samples so the output catches up", offs);
