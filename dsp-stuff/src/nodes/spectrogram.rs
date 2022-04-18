@@ -18,7 +18,7 @@ use rivulet::View;
 
 pub struct Spectrogram {
     id: NodeId,
-    outputs: Arc<HashMap<String, PortId>>,
+    outputs: PortStorage,
     inputs: PortStorage,
     buffer: Arc<Mutex<VecDeque<Vec<Frequency>>>>,
     buffer_size: Atomic<usize>,
@@ -54,19 +54,18 @@ impl Node for Spectrogram {
         self.id
     }
 
-    fn inputs(&self) -> Arc<HashMap<String, PortId>> {
-        self.inputs.ensure_name("in");
-        self.inputs.all()
+    fn inputs(&self) -> &PortStorage {
+        &self.inputs
     }
 
-    fn outputs(&self) -> Arc<HashMap<String, PortId>> {
-        Arc::clone(&self.outputs)
+    fn outputs(&self) -> &PortStorage {
+        &self.outputs
     }
 
     fn save(&self) -> serde_json::Value {
         let cfg = SpectrogramConfig {
             id: self.id,
-            inputs: self.inputs.all().as_ref().clone(),
+            inputs: self.inputs.get_all(),
             buffer_size: self.buffer_size.load(atomig::Ordering::Relaxed),
             fft_size: self.fft_size.load(atomig::Ordering::Relaxed),
             upper_bound: self.upper_bound.load(atomig::Ordering::Relaxed),
@@ -200,18 +199,19 @@ impl Node for Spectrogram {
     }
 
     fn new(id: NodeId) -> Self {
-        let this = Self {
+        let inputs = PortStorage::default();
+        inputs.add("in".to_owned());
+
+        Self {
             id,
-            inputs: PortStorage::default(),
+            inputs,
             outputs: Default::default(),
             buffer: Arc::new(Mutex::new(VecDeque::with_capacity(10))),
             buffer_size: Atomic::new(250),
             fft_size: Atomic::new(512),
             lower_bound: Atomic::new(20),
             upper_bound: Atomic::new(20_000),
-        };
-
-        this
+        }
     }
 }
 

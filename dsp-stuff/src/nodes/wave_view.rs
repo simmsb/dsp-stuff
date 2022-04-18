@@ -17,7 +17,7 @@ use simple_moving_average::{SumTreeSMA, SMA};
 
 pub struct WaveView {
     id: NodeId,
-    outputs: Arc<HashMap<String, PortId>>,
+    outputs: PortStorage,
     inputs: PortStorage,
     average_throughput: Arc<Mutex<SumTreeSMA<f32, f32, 32>>>,
     view_sink: Arc<Mutex<Sink<f32>>>,
@@ -48,20 +48,18 @@ impl Node for WaveView {
         self.id
     }
 
-    fn inputs(&self) -> Arc<HashMap<String, PortId>> {
-        self.inputs.ensure_name("in");
-        self.inputs.all()
+    fn inputs(&self) -> &PortStorage {
+        &self.inputs
     }
 
-    fn outputs(&self) -> Arc<HashMap<String, PortId>> {
-        Arc::clone(&self.outputs)
+    fn outputs(&self) -> &PortStorage {
+        &self.outputs
     }
 
     fn save(&self) -> serde_json::Value {
         let cfg = WaveViewConfig {
             id: self.id,
-
-            inputs: self.inputs.all().as_ref().clone(),
+            inputs: self.inputs.get_all(),
         };
 
         serde_json::to_value(cfg).unwrap()
@@ -138,17 +136,18 @@ impl Node for WaveView {
     fn new(id: NodeId) -> Self {
         let (sink, source) = rivulet::circular_buffer::<f32>(4096);
         let source = source.into_view();
-        let this = Self {
+        let inputs = PortStorage::default();
+        inputs.add("in".to_owned());
+
+        Self {
             id,
-            inputs: PortStorage::default(),
-            outputs: Default::default(),
+            inputs,
+            outputs: PortStorage::default(),
             average_throughput: Arc::new(Mutex::new(SumTreeSMA::new())),
             view_sink: Arc::new(Mutex::new(sink)),
             view_source: Arc::new(Mutex::new(source)),
             should_count_input: Atomic::new(false),
-        };
-
-        this
+        }
     }
 }
 

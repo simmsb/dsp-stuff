@@ -15,7 +15,6 @@ pub mod low_pass;
 pub mod mix;
 #[cfg(feature = "gpl_effects")]
 pub mod muff;
-pub mod multiply;
 pub mod output;
 pub mod reverb;
 pub mod signal_gen;
@@ -27,7 +26,6 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<dyn Perform>)] = &[
     ("Output", |id| Arc::new(output::Output::new(id))),
     ("Gain", |id| Arc::new(gain::Gain::new(id))),
     ("Mix", |id| Arc::new(mix::Mix::new(id))),
-    ("Multiply", |id| Arc::new(multiply::Multiply::new(id))),
     ("Distort", |id| Arc::new(distort::Distort::new(id))),
     #[cfg(feature = "gpl_effects")]
     ("Muff", |id| Arc::new(muff::Muff::new(id))),
@@ -48,7 +46,6 @@ pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<dyn Perform>)] = &[
     ("output", |v| Arc::new(output::Output::restore(v))),
     ("gain", |v| Arc::new(gain::Gain::restore(v))),
     ("mix", |v| Arc::new(mix::Mix::restore(v))),
-    ("multiply", |v| Arc::new(multiply::Multiply::restore(v))),
     ("distort", |v| Arc::new(distort::Distort::restore(v))),
     #[cfg(feature = "gpl_effects")]
     ("muff", |v| Arc::new(muff::Muff::restore(v))),

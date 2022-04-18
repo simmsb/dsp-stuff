@@ -1,52 +1,11 @@
-[package]
-name = "dsp-stuff"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-arc-swap = { version = "1.5.0", features = [ "serde" ] }
-async-trait = "0.1.52"
-collect_slice = "1.2.0"
-color-eyre = "0.6.1"
-cpal = { version = "0.13.5", features = ["jack"] }
-eframe = { version = "0.17.0", features = ["default_fonts", "persistence"], default-features = false }
-egui = "0.17.0"
-egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "536cadd810d631f410478596a7bc281a2171eab6" }
-itertools = "0.10.3"
-lazy_static = "1.4.0"
-oneshot = "0.1.3"
-rivulet = { git = "https://github.com/simmsb/rivulet", rev = "b2416e5e7eb87162d693c74ed62df33e252e9647" }
-tokio = { version = "1.17.0", features = ["rt", "time", "macros", "rt-multi-thread", "tracing", "sync"] }
-tracing = "0.1.32"
-tracing-error = "0.2.0"
-tracing-subscriber = { version = "0.3.9", features = ["env-filter"] }
-console-subscriber = { version = "0.1.3", optional = true }
-derivative = "2.2.0"
-serde = { version = "1.0.136", features = ["derive", "rc"] }
-serde_json = "1.0.79"
-rfd = { version = "0.8.1", features = ["xdg-portal"], default-features = false }
-atomig = { version = "0.3.3", features = ["derive"] }
-strum = { version = "0.24.0", features = ["derive"] }
-audioviz = { version = "0.4.4", default-features = false }
-dasp_envelope = { version = "0.11.0", features = ["peak"] }
-dasp_peak = "0.11.0"
-simple_moving_average = "0.1.2"
-dsp-stuff-gpl = { git = "https://github.com/simmsb/dsp-stuff-gpl.git", optional = true, rev = "170f1680a08fd41379aa49bf88a1e4553d50929c" }
-clap = { version = "3.1.6", features = ["derive"] }
-# tracing-flame = { version = "0.2.0" }
-#native_helper = { git = "https://github.com/emilk/websocket_experiment.git" }
+[workspace]
+members = [
+        "dsp-stuff",
+        "dsp-stuff-derive",
+]
+default-members = ["dsp-stuff"]
 
 [patch.crates-io]
-egui = { git = "https://github.com/emilk/egui", rev = "465c96122cf6aea72e7fbd8d6e7c2c048e88424f" }
-egui_glow = { git = "https://github.com/emilk/egui", rev = "465c96122cf6aea72e7fbd8d6e7c2c048e88424f" }
-eframe = { git = "https://github.com/emilk/egui", rev = "465c96122cf6aea72e7fbd8d6e7c2c048e88424f" }
-
-[features]
-gpl_effects = ["dsp-stuff-gpl"]
-console = ["console-subscriber"]
-windows = ["cpal/asio"]
-
-[profile.release]
-debug = 1
+egui = { git = "https://github.com/emilk/egui", rev = "2d2022fb7290bf4fcca373ad3a0dc98b680a9203" }
+egui_glow = { git = "https://github.com/emilk/egui", rev = "2d2022fb7290bf4fcca373ad3a0dc98b680a9203" }
+eframe = { git = "https://github.com/emilk/egui", rev = "2d2022fb7290bf4fcca373ad3a0dc98b680a9203" }

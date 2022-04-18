@@ -11,7 +11,7 @@ use tokio::sync::Mutex;
 
 pub struct Input {
     id: NodeId,
-    inputs: Arc<HashMap<String, PortId>>,
+    inputs: PortStorage,
     outputs: PortStorage,
     source: Arc<Mutex<Option<splittable::View<Source<f32>>>>>,
 
@@ -88,13 +88,12 @@ impl Node for Input {
         self.id
     }
 
-    fn inputs(&self) -> Arc<HashMap<String, PortId>> {
-        Arc::clone(&self.inputs)
+    fn inputs(&self) -> &PortStorage {
+        &self.inputs
     }
 
-    fn outputs(&self) -> Arc<HashMap<String, PortId>> {
-        self.outputs.ensure_name("out");
-        self.outputs.all()
+    fn outputs(&self) -> &PortStorage {
+        &self.outputs
     }
 
     fn save(&self) -> serde_json::Value {
@@ -103,7 +102,7 @@ impl Node for Input {
             selected_host: self.selected_host.load().name().to_owned(),
             selected_device: Option::as_ref(&self.selected_device.load())
                 .map(|(n, _)| n.to_owned()),
-            outputs: self.outputs.all().as_ref().clone(),
+            outputs: self.outputs.get_all(),
         };
 
         serde_json::to_value(cfg).unwrap()
@@ -191,10 +190,13 @@ impl Node for Input {
             .devices()
             .unwrap();
 
+        let outputs = PortStorage::default();
+        outputs.add("out".to_owned());
+
         let this = Self {
             id,
-            inputs: Default::default(),
-            outputs: PortStorage::default(),
+            inputs: PortStorage::default(),
+            outputs,
             source: Arc::new(Mutex::new(None)),
 
             cached_hosts: ArcSwap::new(Arc::new(hosts)),

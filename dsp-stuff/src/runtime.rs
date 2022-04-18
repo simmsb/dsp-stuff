@@ -231,6 +231,10 @@ impl UiContext {
                 for (input, id) in node
                     .instance
                     .inputs()
+                    .0
+                    .read()
+                    .unwrap()
+                    .ports
                     .iter()
                     .map(|(k, v)| (k.to_owned(), *v))
                 {
@@ -245,6 +249,10 @@ impl UiContext {
                 for (output, id) in node
                     .instance
                     .outputs()
+                    .0
+                    .read()
+                    .unwrap()
+                    .ports
                     .iter()
                     .map(|(k, v)| (k.to_owned(), *v))
                 {
@@ -356,11 +364,11 @@ impl UiContext {
 
     fn add_node(&mut self, id: NodeId, instance: Arc<dyn Perform>) {
         let inst = NodeInstance::new(id, instance);
-        for (_, port) in inst.instance.inputs().iter() {
+        for port in inst.instance.inputs().0.read().unwrap().ports.values() {
             self.inputs.insert((inst.id, *port), HashSet::new());
         }
 
-        for (_, port) in inst.instance.outputs().iter() {
+        for port in inst.instance.outputs().0.read().unwrap().ports.values() {
             self.outputs.insert((inst.id, *port), HashSet::new());
         }
 
@@ -389,7 +397,7 @@ impl UiContext {
 }
 
 impl eframe::epi::App for UiContext {
-    fn update(&mut self, ctx: &egui::Context, frame: &eframe::epi::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::epi::Frame) {
         let _guard = self.runtime.enter();
 
         let mut visuals = if self.theme.dark {

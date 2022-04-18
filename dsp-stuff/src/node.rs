@@ -1,10 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
 
-use arc_swap::ArcSwap;
+
 use rivulet::{
     circular_buffer::{Sink, Source},
     splittable, View, ViewMut,
 };
+use serde::{Serialize, Deserialize};
+use std::sync::RwLock;
 
 use crate::ids::{NodeId, PortId};
 
@@ -12,29 +14,58 @@ pub type NodeInputs<'a, 'b, 'c> =
     &'a mut HashMap<PortId, &'b mut [&'c mut splittable::View<Source<f32>>]>;
 pub type NodeOutputs<'a, 'b, 'c> = &'a mut HashMap<PortId, &'b mut [&'c mut Sink<f32>]>;
 
+#[derive(Debug, Default, Clone)]
+pub struct PortStorageInner {
+    pub ports: HashMap<String, PortId>,
+    pub deleted: Vec<PortId>,
+}
+
+impl PortStorageInner {
+    fn new(ports: HashMap<String, PortId>) -> Self {
+        Self {
+            ports,
+            deleted: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
-pub struct PortStorage(ArcSwap<HashMap<String, PortId>>);
+pub struct PortStorage(pub Arc<RwLock<PortStorageInner>>);
+
+impl Serialize for PortStorage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+
+        self.get_all().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for PortStorage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de> {
+        let d = <HashMap<String, PortId> as Deserialize>::deserialize(deserializer)?;
+
+        Ok(PortStorage::new(d))
+    }
+}
 
 impl PortStorage {
     pub fn new(inner: HashMap<String, PortId>) -> Self {
-        PortStorage(ArcSwap::new(Arc::new(inner)))
+        PortStorage(Arc::new(RwLock::new(PortStorageInner::new(inner))))
     }
 
-    pub fn ensure_name(&self, name: &str) {
-        self.0.rcu(|x| {
-            let mut map = HashMap::new();
-            map.clone_from(x);
-            map.entry(name.to_owned()).or_insert_with(PortId::generate);
-            map
-        });
+    pub fn add(&self, name: String) {
+        self.0.write().unwrap().ports.insert(name, PortId::generate());
     }
 
     pub fn get(&self, name: &str) -> Option<PortId> {
-        self.0.load().get(name).copied()
+        self.0.read().unwrap().ports.get(name).copied()
     }
 
-    pub fn all(&self) -> Arc<HashMap<String, PortId>> {
-        self.0.load_full()
+    pub fn get_all(&self) -> HashMap<String, PortId> {
+        self.0.read().unwrap().ports.clone()
     }
 }
 
@@ -48,10 +79,10 @@ pub trait Node: Send + Sync {
     fn id(&self) -> NodeId;
 
     /// The ids and names of the input nodes
-    fn inputs(&self) -> Arc<HashMap<String, PortId>>;
+    fn inputs(&self) -> &PortStorage;
 
     /// The ids and names of the output nodes
-    fn outputs(&self) -> Arc<HashMap<String, PortId>>;
+    fn outputs(&self) -> &PortStorage;
 
     fn render(&self, ui: &mut egui::Ui);
 
