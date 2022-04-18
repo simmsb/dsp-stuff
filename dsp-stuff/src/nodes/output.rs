@@ -122,7 +122,7 @@ impl Node for Output {
             .hosts()
             .unwrap()
             .into_iter()
-            .find(|x| x.name() == &cfg.selected_host)
+            .find(|x| x.name() == cfg.selected_host)
         {
             this.load_device(host, cfg.selected_device);
         };

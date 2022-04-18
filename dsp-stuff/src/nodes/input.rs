@@ -120,7 +120,7 @@ impl Node for Input {
             .hosts()
             .unwrap()
             .into_iter()
-            .find(|x| x.name() == &cfg.selected_host)
+            .find(|x| x.name() == cfg.selected_host)
         {
             this.load_device(host, cfg.selected_device);
         };
@@ -193,7 +193,7 @@ impl Node for Input {
         let outputs = PortStorage::default();
         outputs.add("out".to_owned());
 
-        let this = Self {
+        Self {
             id,
             inputs: PortStorage::default(),
             outputs,
@@ -204,9 +204,7 @@ impl Node for Input {
 
             cached_devices: ArcSwap::new(Arc::new(devices)),
             selected_device: ArcSwap::new(Arc::new(None)),
-        };
-
-        this
+        }
     }
 }
 

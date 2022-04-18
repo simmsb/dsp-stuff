@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use darling::util::{Flag, Override, SpannedValue};
 use darling::{ast, FromDeriveInput, FromField, FromMeta, ToTokens};
 use proc_macro2::TokenStream;
@@ -9,6 +11,7 @@ use syn::{parse_macro_input, DeriveInput};
 struct SliderOptions {
     range: syn::Expr,
     logarithmic: Flag,
+    as_input: Flag,
     #[darling(default)]
     suffix: Option<String>,
 }
@@ -31,8 +34,6 @@ struct FieldOpts {
     label: SpannedValue<Option<String>>,
 
     /// Display this field as a slider with a given range
-    ///
-    /// Also sets up the field as an input that maps -1.0..=1.0 to start..=end
     #[darling(default)]
     slider: Option<SliderOptions>,
 

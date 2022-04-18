@@ -57,7 +57,7 @@ fn do_soft_clip(sample: f32, level: f32) -> f32 {
     let sample = sample * level;
     let sample = if sample > 1.0 {
         2.0 / 3.0
-    } else if (-1.0 <= sample) && (sample <= 1.0) {
+    } else if (-1.0..=1.0).contains(&sample) {
         sample - (sample.powi(3) / 3.0)
     } else {
         -2.0 / 3.0
@@ -79,9 +79,7 @@ fn do_recip_soft_clip(sample: f32, level: f32) -> f32 {
         return sample;
     }
 
-    let sample = sample.signum() * (1.0 - 1.0 / (sample.abs() * level + 1.0));
-
-    sample
+    sample.signum() * (1.0 - 1.0 / (sample.abs() * level + 1.0))
 }
 
 fn recip_soft_clip(input: &[f32], output: &mut [f32], level: f32) {

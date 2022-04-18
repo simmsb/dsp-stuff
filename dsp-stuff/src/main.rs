@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use clap::Parser;
 
 mod devices;
