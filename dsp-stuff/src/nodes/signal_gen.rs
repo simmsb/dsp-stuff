@@ -1,12 +1,7 @@
-use std::collections::HashMap;
-
 use atomig::Atomic;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    ids::{NodeId, PortId},
-    node::*,
-};
+use crate::{ids::NodeId, node::*};
 
 #[derive(
     Serialize,
@@ -42,7 +37,11 @@ pub struct SignalGen {
 
     #[dsp(slider(range = "-1.0..=1.0"), save, default = "0.5")]
     amplitude: Atomic<f32>,
-    #[dsp(slider(range = "0.1..=20000.0", logarithmic, suffix = " hz"), save, default = "100.0")]
+    #[dsp(
+        slider(range = "0.1..=20000.0", logarithmic, suffix = " hz"),
+        save,
+        default = "100.0"
+    )]
     frequency: Atomic<f32>,
 
     clock: Atomic<f32>,

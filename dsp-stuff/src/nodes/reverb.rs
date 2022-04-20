@@ -1,9 +1,6 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
-use crate::{
-    ids::{NodeId, PortId},
-    node::*,
-};
+use crate::{ids::NodeId, node::*};
 use atomig::Atomic;
 use collect_slice::CollectSlice;
 use rivulet::{
@@ -29,7 +26,12 @@ pub struct Reverb {
     #[dsp(outputs)]
     outputs: PortStorage,
 
-    #[dsp(slider(range = "0.0..=1.0", suffix = "s"), label = "Delay", save, default = "0.5")]
+    #[dsp(
+        slider(range = "0.0..=1.0", suffix = "s"),
+        label = "Delay",
+        save,
+        default = "0.5"
+    )]
     seconds: Atomic<f32>,
     #[dsp(slider(range = "0.0..=1.0"), save, default = "0.5")]
     decay: Atomic<f32>,

@@ -7,7 +7,10 @@ use rivulet::{
 };
 use rsor::Slice;
 use serde::{Deserialize, Serialize};
-use sharded_slab::{Clear, Pool, pool::{OwnedRefMut, RefMut}};
+use sharded_slab::{
+    pool::{OwnedRefMut, RefMut},
+    Clear, Pool,
+};
 use std::sync::RwLock;
 
 use crate::ids::{NodeId, PortId};
@@ -278,7 +281,11 @@ impl<T: SimpleNode> Perform for T {
         let mut input_buf = BUF_POOL.clone().create_owned().unwrap();
         input_buf.resize(inputs.len() * BUF_SIZE, 0.0);
 
-        for (idx, (pipes, buf)) in inputs.iter_mut().zip(input_buf.chunks_mut(BUF_SIZE)).enumerate() {
+        for (idx, (pipes, buf)) in inputs
+            .iter_mut()
+            .zip(input_buf.chunks_mut(BUF_SIZE))
+            .enumerate()
+        {
             tracing::trace!(name = self.title(), id = ?self.id(), "Waiting for {} inputs on port {}", pipes.len(), idx);
 
             let present = collect_and_average(buf, *pipes).await;

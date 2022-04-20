@@ -1,19 +1,15 @@
-use std::collections::HashMap;
-
-use crate::{
-    ids::{NodeId, PortId},
-    node::*,
-};
+use crate::{ids::NodeId, node::*};
 use atomig::Atomic;
 use collect_slice::CollectSlice;
 
 #[derive(dsp_stuff_derive::DspNode)]
-#[dsp(input = "a",
-      input = "b",
-      output = "out",
-      title = "Mix",
-      cfg_name = "mix",
-      description = "Mix two signals together"
+#[dsp(
+    input = "a",
+    input = "b",
+    output = "out",
+    title = "Mix",
+    cfg_name = "mix",
+    description = "Mix two signals together"
 )]
 pub struct Mix {
     #[dsp(id)]
@@ -23,7 +19,12 @@ pub struct Mix {
     #[dsp(outputs)]
     outputs: PortStorage,
 
-    #[dsp(slider(range = "0.0..=1.0"), label = "Ratio (a:b)", save, default="0.5")]
+    #[dsp(
+        slider(range = "0.0..=1.0"),
+        label = "Ratio (a:b)",
+        save,
+        default = "0.5"
+    )]
     ratio: Atomic<f32>,
 }
 
@@ -36,7 +37,8 @@ impl SimpleNode for Mix {
         let input_b = inputs.get("b").unwrap();
         let output = outputs.get("out").unwrap();
 
-        input_a.iter()
+        input_a
+            .iter()
             .zip(input_b.iter())
             .map(|(a, b)| (b * ratio) + (a * (1.0 - ratio)))
             .collect_slice(output);

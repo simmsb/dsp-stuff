@@ -1,9 +1,4 @@
-use std::collections::HashMap;
-
-use crate::{
-    ids::{NodeId, PortId},
-    node::*,
-};
+use crate::{ids::NodeId, node::*};
 use atomig::Atomic;
 use collect_slice::CollectSlice;
 use serde::{Deserialize, Serialize};

@@ -153,11 +153,7 @@ impl Node for WaveView {
 
 impl SimpleNode for WaveView {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
-    fn process(
-        &self,
-        inputs: ProcessInput,
-        _outputs: ProcessOutput,
-    ) {
+    fn process(&self, inputs: ProcessInput, _outputs: ProcessOutput) {
         let input = inputs.get("in").unwrap();
 
         let mut sink = self.view_sink.lock().unwrap();

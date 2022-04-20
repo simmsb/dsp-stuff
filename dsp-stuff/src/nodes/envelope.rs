@@ -1,12 +1,6 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
-use crate::{
-    ids::{NodeId, PortId},
-    node::*,
-};
+use crate::{ids::NodeId, node::*};
 use atomig::Atomic;
 use collect_slice::CollectSlice;
 use dasp_envelope::{detect::Peak, Detector};
