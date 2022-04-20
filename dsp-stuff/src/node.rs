@@ -7,7 +7,7 @@ use rivulet::{
 };
 use rsor::Slice;
 use serde::{Deserialize, Serialize};
-use sharded_slab::{Clear, Pool};
+use sharded_slab::{Clear, Pool, pool::{OwnedRefMut, RefMut}};
 use std::sync::RwLock;
 
 use crate::ids::{NodeId, PortId};
@@ -244,23 +244,31 @@ static PRESENT_INPUT_POOL: Lazy<Arc<Pool<Vec<bool>>>> = Lazy::new(|| Arc::new(Po
 static BUF_POOL: Lazy<Arc<Pool<Vec<f32>>>> = Lazy::new(|| Arc::new(Pool::new()));
 static REF_POOL: Lazy<Arc<Pool<NoClear<Slice<[f32]>>>>> = Lazy::new(|| Arc::new(Pool::new()));
 
+pub const BUF_SIZE: usize = 128;
+
+fn drop_key<T: Clear + Default>(x: OwnedRefMut<T>) -> usize {
+    x.key()
+}
+
+fn drop_key_<T: Clear + Default>(x: RefMut<T>) -> usize {
+    x.key()
+}
+
 #[async_trait::async_trait]
 impl<T: SimpleNode> Perform for T {
     async fn perform(&self, inputs: NodeInputs<'_, '_, '_>, outputs: NodeOutputs<'_, '_, '_>) {
-        let buf_size = 128;
-
         // prep outputs
 
         let mut output_buf = BUF_POOL.clone().create_owned().unwrap();
-        output_buf.resize(outputs.len() * buf_size, 0.0);
+        output_buf.resize(outputs.len() * BUF_SIZE, 0.0);
 
         let mut output_slice_slice = REF_POOL.clone().create_owned().unwrap();
-        let output_slice = output_slice_slice.from_iter_mut(output_buf.chunks_mut(buf_size));
+        let output_slice = output_slice_slice.from_iter_mut(output_buf.chunks_mut(BUF_SIZE));
 
         for (idx, output_port) in outputs.iter_mut().enumerate() {
             tracing::trace!(name = self.title(), id = ?self.id(), "Waiting for {} outputs on port {}", output_port.len(), idx);
             for output_pipe in output_port.iter_mut() {
-                output_pipe.grant(buf_size).await.unwrap();
+                output_pipe.grant(BUF_SIZE).await.unwrap();
             }
         }
 
@@ -268,9 +276,9 @@ impl<T: SimpleNode> Perform for T {
 
         let mut present_inputs = PRESENT_INPUT_POOL.clone().create_owned().unwrap();
         let mut input_buf = BUF_POOL.clone().create_owned().unwrap();
-        input_buf.resize(inputs.len() * buf_size, 0.0);
+        input_buf.resize(inputs.len() * BUF_SIZE, 0.0);
 
-        for (idx, (pipes, buf)) in inputs.iter_mut().zip(input_buf.chunks_mut(buf_size)).enumerate() {
+        for (idx, (pipes, buf)) in inputs.iter_mut().zip(input_buf.chunks_mut(BUF_SIZE)).enumerate() {
             tracing::trace!(name = self.title(), id = ?self.id(), "Waiting for {} inputs on port {}", pipes.len(), idx);
 
             let present = collect_and_average(buf, *pipes).await;
@@ -278,7 +286,7 @@ impl<T: SimpleNode> Perform for T {
         }
 
         let mut input_slice_slice = REF_POOL.create().unwrap();
-        let input_slice = input_slice_slice.from_iter(input_buf.chunks(buf_size));
+        let input_slice = input_slice_slice.from_iter(input_buf.chunks(BUF_SIZE));
 
         // run process
 
@@ -295,16 +303,11 @@ impl<T: SimpleNode> Perform for T {
 
         self.process(pinput, poutput);
 
-        REF_POOL.clear(input_slice_slice.key());
-        REF_POOL.clear(output_slice_slice.key());
-        BUF_POOL.clear(input_buf.key());
-        BUF_POOL.clear(output_buf.key());
-
         // copy outputs
 
-        for (output_port, buf) in outputs.iter_mut().zip(output_buf.chunks(buf_size)) {
+        for (output_port, buf) in outputs.iter_mut().zip(output_buf.chunks(BUF_SIZE)) {
             for output_pipe in output_port.iter_mut() {
-                output_pipe.view_mut()[..buf_size].copy_from_slice(buf);
+                output_pipe.view_mut()[..BUF_SIZE].copy_from_slice(buf);
             }
         }
 
@@ -315,7 +318,7 @@ impl<T: SimpleNode> Perform for T {
                 // if the view is less than the buf size, then we didn't actually read from it
                 // but skip it anyway
                 // however this shouldn't actuall happen
-                input_pipe.release(buf_size.min(input_pipe.view().len()));
+                input_pipe.release(BUF_SIZE.min(input_pipe.view().len()));
             }
         }
 
@@ -323,8 +326,14 @@ impl<T: SimpleNode> Perform for T {
 
         for output_port in outputs.iter_mut() {
             for output_pipe in output_port.iter_mut() {
-                output_pipe.release(buf_size);
+                output_pipe.release(BUF_SIZE);
             }
         }
+
+        assert!(REF_POOL.clear(drop_key_(input_slice_slice)));
+        assert!(REF_POOL.clear(drop_key(output_slice_slice)));
+        assert!(BUF_POOL.clear(drop_key(input_buf)));
+        assert!(BUF_POOL.clear(drop_key(output_buf)));
+        assert!(PRESENT_INPUT_POOL.clear(drop_key(present_inputs)));
     }
 }

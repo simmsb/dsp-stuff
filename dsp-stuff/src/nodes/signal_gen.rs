@@ -27,7 +27,7 @@ enum Mode {
 
 #[derive(dsp_stuff_derive::DspNode)]
 #[dsp(
-    input = "in",
+    output = "out",
     title = "Signal Generator",
     cfg_name = "signal_gen",
     description = "Generate a signal with a given frequency and amplitude"

@@ -42,7 +42,7 @@ pub struct Distort {
     #[dsp(outputs)]
     outputs: PortStorage,
 
-    #[dsp(slider(range = "0.0..=10.0"), save)]
+    #[dsp(slider(range = "0.0..=10.0", as_input), save)]
     level: Atomic<f32>,
 
     #[dsp(select, save, default = "Mode::SoftClip")]
@@ -66,11 +66,12 @@ fn do_soft_clip(sample: f32, level: f32) -> f32 {
     sample / level
 }
 
-fn soft_clip(input: &[f32], output: &mut [f32], level: f32) {
+fn soft_clip(input: &[f32], output: &mut [f32], level: &[f32]) {
     input
         .iter()
         .copied()
-        .map(|x| do_soft_clip(x, level))
+        .zip(level)
+        .map(|(x, level)| do_soft_clip(x, *level))
         .collect_slice(output);
 }
 
@@ -82,11 +83,12 @@ fn do_recip_soft_clip(sample: f32, level: f32) -> f32 {
     sample.signum() * (1.0 - 1.0 / (sample.abs() * level + 1.0))
 }
 
-fn recip_soft_clip(input: &[f32], output: &mut [f32], level: f32) {
+fn recip_soft_clip(input: &[f32], output: &mut [f32], level: &[f32]) {
     input
         .iter()
         .copied()
-        .map(|x| do_recip_soft_clip(x, level))
+        .zip(level)
+        .map(|(x, level)| do_recip_soft_clip(x, *level))
         .collect_slice(output);
 }
 
@@ -98,28 +100,29 @@ fn do_tanh(sample: f32, level: f32) -> f32 {
     (sample * level).tanh()
 }
 
-fn tanh(input: &[f32], output: &mut [f32], level: f32) {
+fn tanh(input: &[f32], output: &mut [f32], level: &[f32]) {
     input
         .iter()
         .copied()
-        .map(|x| do_tanh(x, level))
+        .zip(level)
+        .map(|(x, level)| do_tanh(x, *level))
         .collect_slice(output);
 }
 
 impl SimpleNode for Distort {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(&self, inputs: ProcessInput, mut outputs: ProcessOutput) {
-        let level = self.level.load(std::sync::atomic::Ordering::Relaxed);
-
+        let mut level = [0.0; BUF_SIZE];
+        self.level_input(&inputs, &mut level);
         let input = inputs.get("in").unwrap();
         let output = outputs.get("out").unwrap();
 
         let mode = self.mode.load(std::sync::atomic::Ordering::Relaxed);
 
         match mode {
-            Mode::SoftClip => soft_clip(input, output, level),
-            Mode::Tanh => tanh(input, output, level),
-            Mode::RecipSoftClip => recip_soft_clip(input, output, level),
+            Mode::SoftClip => soft_clip(input, output, &level),
+            Mode::Tanh => tanh(input, output, &level),
+            Mode::RecipSoftClip => recip_soft_clip(input, output, &level),
         }
     }
 }

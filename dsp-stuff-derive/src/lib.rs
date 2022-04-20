@@ -88,7 +88,7 @@ fn do_node(dsp: &Dsp) -> darling::Result<TokenStream> {
     let render = do_render(&dsp.data, &dsp.custom_render, &dsp.after_settings_change)?;
     let (cfg_struct, save_restore) = do_save_restore(&dsp.ident, &dsp.data);
     let new = do_new(&dsp.inputs, &dsp.outputs, &dsp.data);
-    // let helpers = do_slider_as_input_helpers(&dsp.ident, &dsp.data);
+    let helpers = do_slider_as_input_helpers(&dsp.data);
 
     let ident = &dsp.ident;
     let tokens = quote! {
@@ -106,40 +106,54 @@ fn do_node(dsp: &Dsp) -> darling::Result<TokenStream> {
             #new
         }
 
-        // impl #ident {
-        //     #helpers
-        // }
+        impl #ident {
+            #helpers
+        }
     };
 
     Ok(tokens)
 }
 
-// fn do_slider_as_input_helpers(
-//     name: &syn::Ident,
-//     data: &ast::Data<darling::util::Ignored, FieldOpts>
-// ) -> TokenStream {
-//     let fields = data.as_ref().take_struct().unwrap();
-//     let slider_input_fields = fields
-//         .iter()
-//         .filter(|f| {
-//             f.slider.as_ref().map_or(false, |s| s.as_input.is_present())
-//         })
-//         .map(|f| {
-//             let ident = f.ident.as_ref().unwrap();
-//             let helper_name = quote::format_ident!("{}_input", ident);
+fn do_slider_as_input_helpers(data: &ast::Data<darling::util::Ignored, FieldOpts>) -> TokenStream {
+    let fields = data.as_ref().take_struct().unwrap();
+    let slider_input_fields = fields
+        .iter()
+        .filter(|f| {
+            f.slider.as_ref().map_or(false, |s| s.as_input.is_present())
+        })
+        .map(|f| {
+            let ident = f.ident.as_ref().unwrap();
+            let helper_name = quote::format_ident!("{}_input", ident);
+            let range = &f.slider.as_ref().unwrap().range;
 
-//             quote! {
-//                 #[::auto_enums::auto_enum(::std::iter::Iterator)]
-//                 fn #helper_name(&self, inputs: &::std::collections::HashMap) -> impl ::std::iter::Iterator<Item = f32> {
+            quote! {
+                fn #helper_name(&self, inputs: &crate::node::ProcessInput, out_buf: &mut [f32]) {
+                    use ::collect_slice::CollectSlice;
+                    if let ::std::option::Option::Some(buf) = inputs.get_checked(::std::stringify!(#ident)) {
+                        let range = #range;
 
-//                 }
-//             }
+                        buf.iter()
+                            .map(|x| {
+                                 let y = (x + 1.0) / 2.0;
+                                 let z = y.clamp(0.0, 1.0);
 
-//         });
+                                 range.start() + (range.end() - range.start()) * z
+                            })
+                            .collect_slice(out_buf);
+                        self.#ident.store(out_buf[0], ::std::sync::atomic::Ordering::Relaxed);
+                    } else {
+                        let val = self.#ident.load(::std::sync::atomic::Ordering::Relaxed);
+                        out_buf.fill(val);
+                    }
+                }
+            }
 
+        });
 
-//     todo!()
-// }
+    quote! {
+        #(#slider_input_fields)*
+    }
+}
 
 fn do_new(
     inputs: &[String],
@@ -156,9 +170,7 @@ fn do_new(
         .unwrap();
     let inputs_field = fields
         .iter()
-        .find(|f| {
-            f.inputs.is_present()
-        })
+        .find(|f| f.inputs.is_present())
         .unwrap()
         .ident
         .as_ref()
@@ -173,10 +185,8 @@ fn do_new(
 
     let slider_input_fields = fields
         .iter()
-        .filter(|f| {
-            f.slider.as_ref().map_or(false, |s| s.as_input.is_present())
-        })
-        .map(|f| f.ident.as_ref().unwrap());
+        .filter(|f| f.slider.as_ref().map_or(false, |s| s.as_input.is_present()))
+        .map(|f| f.ident.as_ref().unwrap().to_string());
 
     let field_defaulters = fields.iter().filter_map(|f| {
         if f.id.is_present() || f.inputs.is_present() || f.outputs.is_present() {

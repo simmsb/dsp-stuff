@@ -258,6 +258,7 @@ impl UiContext {
                     .unwrap()
                     .ports
                     .iter()
+                    .sorted_by_key(|(k, _)| *k)
                     .map(|(k, v)| (k.to_owned(), *v))
                 {
                     n.with_input_attribute(id.get(), PinArgs::default(), move |ui| {
@@ -276,6 +277,7 @@ impl UiContext {
                     .unwrap()
                     .ports
                     .iter()
+                    .sorted_by_key(|(k, _)| *k)
                     .map(|(k, v)| (k.to_owned(), *v))
                 {
                     n.with_output_attribute(id.get(), PinArgs::default(), move |ui| {
@@ -335,10 +337,12 @@ impl UiContext {
                 self.restart_node(start.0);
                 devices::invoke(devices::DeviceCommand::TriggerResync);
             } else {
-                tracing::debug!(
+                tracing::info!(
+                    inputs = ?self.inputs,
+                    outputs = ?self.outputs,
                     "Attempt to create out-out or in-in link between {:?}, {:?}",
                     start,
-                    end
+                    end,
                 );
             };
         }
