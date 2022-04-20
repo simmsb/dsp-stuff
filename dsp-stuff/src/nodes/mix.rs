@@ -20,7 +20,7 @@ pub struct Mix {
     outputs: PortStorage,
 
     #[dsp(
-        slider(range = "0.0..=1.0"),
+        slider(range = "0.0..=1.0", as_input),
         label = "Ratio (a:b)",
         save,
         default = "0.5"
@@ -31,7 +31,8 @@ pub struct Mix {
 impl SimpleNode for Mix {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(&self, inputs: ProcessInput, mut outputs: ProcessOutput) {
-        let ratio = self.ratio.load(std::sync::atomic::Ordering::Relaxed);
+        let mut ratio = [0.0; BUF_SIZE];
+        self.ratio_input(&inputs, &mut ratio);
 
         let input_a = inputs.get("a").unwrap();
         let input_b = inputs.get("b").unwrap();
@@ -39,8 +40,9 @@ impl SimpleNode for Mix {
 
         input_a
             .iter()
-            .zip(input_b.iter())
-            .map(|(a, b)| (b * ratio) + (a * (1.0 - ratio)))
+            .zip(input_b)
+            .zip(ratio)
+            .map(|((a, b), ratio)| (b * ratio) + (a * (1.0 - ratio)))
             .collect_slice(output);
     }
 }

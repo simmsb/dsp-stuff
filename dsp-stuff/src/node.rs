@@ -171,6 +171,8 @@ pub async fn collect_and_average(
         r = true;
         num_frames += 1.0;
 
+
+
         for (a, b) in output.iter_mut().zip(in_.view()[..buf_size].iter()) {
             *a += b;
         }

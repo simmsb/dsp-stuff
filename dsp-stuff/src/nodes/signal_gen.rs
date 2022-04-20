@@ -35,10 +35,10 @@ pub struct SignalGen {
     #[dsp(outputs)]
     outputs: PortStorage,
 
-    #[dsp(slider(range = "-1.0..=1.0"), save, default = "0.5")]
+    #[dsp(slider(range = "-1.0..=1.0", as_input), save, default = "0.5")]
     amplitude: Atomic<f32>,
     #[dsp(
-        slider(range = "0.1..=20000.0", logarithmic, suffix = " hz"),
+        slider(range = "0.1..=20000.0", logarithmic, suffix = " hz", as_input),
         save,
         default = "100.0"
     )]
@@ -52,44 +52,43 @@ pub struct SignalGen {
 
 impl SignalGen {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
-    fn do_sine(&self, output: &mut [f32]) {
+    fn do_sine(&self, output: &mut [f32], amplitude: &[f32], frequency: &[f32]) {
         let clock = self.clock.load(std::sync::atomic::Ordering::Relaxed);
 
-        let amplitude = self.amplitude.load(std::sync::atomic::Ordering::Relaxed);
-        let frequency = self.frequency.load(std::sync::atomic::Ordering::Relaxed);
-
         let sample_rate = 48000.0;
-        let steps_per_sample = frequency / sample_rate;
+        let mut total = 0.0;
 
-        self.clock.store(
-            (clock + output.len() as f32 * steps_per_sample) % 1.0,
-            std::sync::atomic::Ordering::Relaxed,
-        );
-
-        for (idx, v) in output.iter_mut().enumerate() {
-            *v =
-                ((clock + steps_per_sample * idx as f32) * std::f32::consts::TAU).sin() * amplitude;
+        for ((v, amplitude), frequency) in output.iter_mut().zip(amplitude).zip(frequency) {
+            let step = frequency / sample_rate;
+            total += step;
+            *v = ((clock + total) * std::f32::consts::TAU).sin() * amplitude;
         }
+
+        self.clock
+            .store((clock + total) % 1.0, std::sync::atomic::Ordering::Relaxed);
     }
 
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
-    fn do_const(&self, output: &mut [f32]) {
-        let amplitude = self.amplitude.load(std::sync::atomic::Ordering::Relaxed);
-
-        output.fill(amplitude);
+    fn do_const(&self, output: &mut [f32], amplitude: &[f32]) {
+        output.copy_from_slice(amplitude);
     }
 }
 
 impl SimpleNode for SignalGen {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
-    fn process(&self, _inputs: ProcessInput, mut outputs: ProcessOutput) {
+    fn process(&self, inputs: ProcessInput, mut outputs: ProcessOutput) {
+        let mut amplitude = [0.0; BUF_SIZE];
+        self.amplitude_input(&inputs, &mut amplitude);
+        let mut frequency = [0.0; BUF_SIZE];
+        self.frequency_input(&inputs, &mut frequency);
+
         let output = outputs.get("out").unwrap();
 
         let mode = self.mode.load(std::sync::atomic::Ordering::Relaxed);
 
         match mode {
-            Mode::Sine => self.do_sine(output),
-            Mode::Constant => self.do_const(output),
+            Mode::Sine => self.do_sine(output, &amplitude, &frequency),
+            Mode::Constant => self.do_const(output, &amplitude),
         }
     }
 }

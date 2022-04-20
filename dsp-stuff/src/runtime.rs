@@ -102,6 +102,15 @@ impl UiContext {
 
         for node in cfg.nodes {
             let restored = NodeInstance::restore(node);
+
+            for port in restored.instance.inputs().get_all().values() {
+                self.inputs.entry((restored.id, *port)).or_default();
+            }
+
+            for port in restored.instance.outputs().get_all().values() {
+                self.outputs.entry((restored.id, *port)).or_default();
+            }
+
             self.nodes.insert(restored.id, restored);
         }
 
@@ -497,6 +506,16 @@ impl eframe::epi::App for UiContext {
                     .clicked()
                 {
                     devices::invoke(devices::DeviceCommand::TriggerResync);
+
+                    for node in self.nodes.values_mut() {
+                        node.stop();
+                    }
+
+                    for link in self.links.values() {
+                        link.resync();
+                    }
+
+                    self.update_all();
                 }
             });
         });
@@ -553,6 +572,18 @@ impl LinkInstance {
             lhs: self.lhs,
             rhs: self.rhs,
         }
+    }
+
+    fn resync(&self) {
+        use rivulet::View;
+
+        let mut sink = self.sink.blocking_lock();
+        let len = sink.view().len();
+        sink.release(len);
+
+        let mut source = self.source.blocking_lock();
+        let len = source.view().len();
+        source.release(len);
     }
 }
 

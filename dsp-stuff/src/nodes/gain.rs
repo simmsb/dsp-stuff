@@ -18,22 +18,22 @@ pub struct Gain {
     #[dsp(outputs)]
     outputs: PortStorage,
 
-    #[dsp(slider(range = "0.0..=10.0"), save, default = "1.0")]
+    #[dsp(slider(range = "0.0..=10.0", as_input), save, default = "1.0")]
     level: Atomic<f32>,
 }
 
 impl SimpleNode for Gain {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(&self, inputs: ProcessInput, mut outputs: ProcessOutput) {
-        let level = self.level.load(std::sync::atomic::Ordering::Relaxed);
-
+        let mut level = [0.0; BUF_SIZE];
+        self.level_input(&inputs, &mut level);
         let input = inputs.get("in").unwrap();
         let output = outputs.get("out").unwrap();
 
         input
             .iter()
-            .copied()
-            .map(|x| x * level)
+            .zip(level)
+            .map(|(x, level)| x * level)
             .collect_slice(output);
     }
 }
