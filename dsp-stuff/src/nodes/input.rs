@@ -219,7 +219,7 @@ impl Perform for Input {
         if let Some(source) = source.as_mut() {
             source.grant(buf_size).await.unwrap();
 
-            for output in outputs.values_mut() {
+            for output in outputs.iter_mut() {
                 for out in output.iter_mut() {
                     out.grant(buf_size).await.unwrap();
                     out.view_mut()[..buf_size].copy_from_slice(&source.view()[..buf_size]);
@@ -230,9 +230,9 @@ impl Perform for Input {
             source.release(buf_size);
 
             // tracing::debug!("Releasing outputs");
-            for output in outputs.values_mut() {
-                for out in output.iter_mut() {
-                    out.release(buf_size);
+            for output_port in outputs.iter_mut() {
+                for output_pipe in output_port.iter_mut() {
+                    output_pipe.release(buf_size);
                 }
             }
         }

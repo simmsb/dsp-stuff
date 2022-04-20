@@ -86,8 +86,10 @@ impl Node for Spectrogram {
         this.buffer_size
             .store(cfg.buffer_size, atomig::Ordering::Relaxed);
         this.fft_size.store(cfg.fft_size, atomig::Ordering::Relaxed);
-        this.upper_bound.store(cfg.upper_bound, atomig::Ordering::Relaxed);
-        this.lower_bound.store(cfg.lower_bound, atomig::Ordering::Relaxed);
+        this.upper_bound
+            .store(cfg.upper_bound, atomig::Ordering::Relaxed);
+        this.lower_bound
+            .store(cfg.lower_bound, atomig::Ordering::Relaxed);
 
         this
     }
@@ -103,8 +105,10 @@ impl Node for Spectrogram {
             let desired_size = vec2(200.0, 140.0);
             let (_id, rect) = ui.allocate_space(desired_size);
 
-            let to_screen =
-                RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, (upper_bound as f32)..=(lower_bound as f32)), rect);
+            let to_screen = RectTransform::from_to(
+                Rect::from_x_y_ranges(0.0..=1.0, (upper_bound as f32)..=(lower_bound as f32)),
+                rect,
+            );
 
             let freqs = self.buffer.lock().unwrap();
 
@@ -220,8 +224,9 @@ impl Perform for Spectrogram {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     async fn perform(&self, inputs: NodeInputs<'_, '_, '_>, _outputs: NodeOutputs<'_, '_, '_>) {
         let buf_size = self.fft_size.load(atomig::Ordering::Relaxed);
-        let collected_inputs = inputs.get_mut(&self.inputs.get("in").unwrap()).unwrap();
-        let merged = collect_and_average(buf_size, collected_inputs).await;
+        let mut fft_buf = vec![0.0; buf_size];
+        let collected_inputs = &mut inputs[self.inputs.get_idx("in").unwrap()];
+        collect_and_average(&mut fft_buf, collected_inputs).await;
 
         let lower_bound = self.lower_bound.load(atomig::Ordering::Relaxed);
         let upper_bound = self.upper_bound.load(atomig::Ordering::Relaxed);
@@ -237,7 +242,7 @@ impl Perform for Spectrogram {
                 manual_position_distribution: None,
                 interpolation: audioviz::spectrum::config::Interpolation::Cubic,
             },
-            merged,
+            fft_buf,
         );
 
         processor.compute_all();
@@ -253,9 +258,9 @@ impl Perform for Spectrogram {
             }
         }
 
-        for input in inputs.values_mut() {
-            for in_ in input.iter_mut() {
-                in_.release(buf_size);
+        for input_port in inputs.iter_mut() {
+            for input_pipe in input_port.iter_mut() {
+                input_pipe.release(buf_size);
             }
         }
     }

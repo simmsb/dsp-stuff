@@ -149,14 +149,17 @@ impl UiContext {
     fn compute_inputs_for(
         &self,
         node: NodeId,
-    ) -> HashMap<PortId, Vec<Arc<Mutex<splittable::View<Source<f32>>>>>> {
+    ) -> Vec<Vec<Arc<Mutex<splittable::View<Source<f32>>>>>> {
+        let storage = self.nodes.get(&node).unwrap().instance.inputs();
+
         let g = self
             .inputs
             .iter()
             .filter(|((n, _), _)| *n == node)
             .group_by(|((_, p), _)| p);
 
-        g.into_iter()
+        let mut v = g
+            .into_iter()
             .map(|(p, v)| {
                 let sources = v
                     .flat_map(|(_, ls)| {
@@ -167,17 +170,28 @@ impl UiContext {
 
                 (*p, sources)
             })
-            .collect::<HashMap<_, _>>()
+            .collect::<HashMap<_, _>>();
+
+        storage
+            .get_idxs()
+            .into_iter()
+            .map(|(pid, idx)| (idx, v.remove(&pid).unwrap_or_default()))
+            .sorted_by_key(|(idx, _)| *idx)
+            .map(|(_, v)| v)
+            .collect_vec()
     }
 
-    fn compute_outputs_for(&self, node: NodeId) -> HashMap<PortId, Vec<Arc<Mutex<Sink<f32>>>>> {
+    fn compute_outputs_for(&self, node: NodeId) -> Vec<Vec<Arc<Mutex<Sink<f32>>>>> {
+        let storage = self.nodes.get(&node).unwrap().instance.outputs();
+
         let g = self
             .outputs
             .iter()
             .filter(|((n, _), _)| *n == node)
             .group_by(|((_, p), _)| p);
 
-        g.into_iter()
+        let mut v = g
+            .into_iter()
             .map(|(p, v)| {
                 let sources = v
                     .flat_map(|(_, ls)| {
@@ -188,7 +202,15 @@ impl UiContext {
 
                 (*p, sources)
             })
-            .collect::<HashMap<_, _>>()
+            .collect::<HashMap<_, _>>();
+
+        storage
+            .get_idxs()
+            .into_iter()
+            .map(|(pid, idx)| (idx, v.remove(&pid).unwrap_or_default()))
+            .sorted_by_key(|(idx, _)| *idx)
+            .map(|(_, v)| v)
+            .collect_vec()
     }
 
     fn update_nodes(&mut self, ui: &mut egui::Ui) {
@@ -582,16 +604,16 @@ impl NodeInstance {
 
     fn start(
         &mut self,
-        mut inputs: HashMap<PortId, Vec<Arc<Mutex<splittable::View<Source<f32>>>>>>,
-        mut outputs: HashMap<PortId, Vec<Arc<Mutex<Sink<f32>>>>>,
+        mut inputs: Vec<Vec<Arc<Mutex<splittable::View<Source<f32>>>>>>,
+        mut outputs: Vec<Vec<Arc<Mutex<Sink<f32>>>>>,
     ) {
         assert!(self.task.is_none());
         let id = self.id;
 
         let instance = Arc::clone(&self.instance);
 
-        let num_inputs: usize = inputs.values().map(|v| v.len()).sum();
-        let num_outputs: usize = outputs.values().map(|v| v.len()).sum();
+        let num_inputs: usize = inputs.iter().map(|v| v.len()).sum();
+        let num_outputs: usize = outputs.iter().map(|v| v.len()).sum();
 
         tracing::debug!(?id, num_inputs, num_outputs, "Starting node");
 
@@ -610,57 +632,47 @@ impl NodeInstance {
             // this is horrible
             // should be fine though since we only do this if the graph is edited
 
-            let mut input_slices_v = HashMap::with_capacity(inputs.len());
-            for (id, input) in &mut inputs {
-                let mut guards = Vec::with_capacity(input.len());
+            let mut input_slices_v = Vec::with_capacity(inputs.len());
+            for input_port in &mut inputs {
+                let mut guards = Vec::with_capacity(input_port.len());
 
-                for source in input {
-                    guards.push(Arc::clone(source).lock_owned().await);
+                for input_pipe in input_port {
+                    guards.push(Arc::clone(input_pipe).lock_owned().await);
                 }
 
-                input_slices_v.insert(*id, guards);
+                input_slices_v.push(guards);
             }
 
             let mut input_slices = input_slices_v
                 .iter_mut()
-                .map(|(id, input)| {
-                    (
-                        *id,
-                        input.iter_mut().map(|g| g.deref_mut()).collect::<Vec<_>>(),
-                    )
-                })
-                .collect::<HashMap<_, _>>();
+                .map(|input| input.iter_mut().map(|g| g.deref_mut()).collect::<Vec<_>>())
+                .collect_vec();
 
-            let mut output_slices_v = HashMap::with_capacity(outputs.len());
-            for (id, output) in &mut outputs {
+            let mut output_slices_v = Vec::with_capacity(outputs.len());
+            for output_port in &mut outputs {
                 let mut guards = Vec::new();
 
-                for sink in output {
-                    guards.push(Arc::clone(sink).lock_owned().await);
+                for output_pipe in output_port {
+                    guards.push(Arc::clone(output_pipe).lock_owned().await);
                 }
 
-                output_slices_v.insert(*id, guards);
+                output_slices_v.push(guards);
             }
 
             let mut output_slices = output_slices_v
                 .iter_mut()
-                .map(|(id, output)| {
-                    (
-                        *id,
-                        output.iter_mut().map(|g| g.deref_mut()).collect::<Vec<_>>(),
-                    )
-                })
-                .collect::<HashMap<_, _>>();
+                .map(|output| output.iter_mut().map(|g| g.deref_mut()).collect::<Vec<_>>())
+                .collect_vec();
 
             let mut input_slices = input_slices
                 .iter_mut()
-                .map(|(id, x)| (*id, x.as_mut_slice()))
-                .collect::<HashMap<_, _>>();
+                .map(|x| x.as_mut_slice())
+                .collect_vec();
 
             let mut output_slices = output_slices
                 .iter_mut()
-                .map(|(id, x)| (*id, x.as_mut_slice()))
-                .collect::<HashMap<_, _>>();
+                .map(|x| x.as_mut_slice())
+                .collect_vec();
 
             loop {
                 let mut perform = instance.perform(&mut input_slices, &mut output_slices);
@@ -688,8 +700,8 @@ impl NodeInstance {
 
     fn restart(
         &mut self,
-        inputs: HashMap<PortId, Vec<Arc<Mutex<splittable::View<Source<f32>>>>>>,
-        outputs: HashMap<PortId, Vec<Arc<Mutex<Sink<f32>>>>>,
+        inputs: Vec<Vec<Arc<Mutex<splittable::View<Source<f32>>>>>>,
+        outputs: Vec<Vec<Arc<Mutex<Sink<f32>>>>>,
     ) {
         // tracing::debug!(id = ?self.id, "Restarting node");
         self.stop();

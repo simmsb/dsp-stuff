@@ -9,6 +9,7 @@ use cpal::{
     Sample, SampleRate,
 };
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use rivulet::{
     circular_buffer::{Sink, Source},
     splittable, SplittableView, View, ViewMut,
@@ -18,125 +19,144 @@ use crate::ids::DeviceId;
 
 type DeviceCmdChan = std::sync::mpsc::SyncSender<(DeviceCommand, oneshot::Sender<DeviceResponse>)>;
 
-lazy_static::lazy_static! {
-    static ref DEVICE_CMD_CHAN: DeviceCmdChan = {
-        let (sender, receiver): (_, std::sync::mpsc::Receiver<(DeviceCommand, oneshot::Sender<DeviceResponse>)>) = std::sync::mpsc::sync_channel(1);
+static DEVICE_CMD_CHAN: Lazy<DeviceCmdChan> = Lazy::new(|| {
+    let (sender, receiver): (
+        _,
+        std::sync::mpsc::Receiver<(DeviceCommand, oneshot::Sender<DeviceResponse>)>,
+    ) = std::sync::mpsc::sync_channel(1);
 
-        std::thread::spawn(move || {
-            let mut devices: HashMap<DeviceId, cpal::Stream> = HashMap::new();
-            let mut resync_counters: HashMap<DeviceId, Arc<AtomicU8>> = HashMap::new();
+    std::thread::spawn(move || {
+        let mut devices: HashMap<DeviceId, cpal::Stream> = HashMap::new();
+        let mut resync_counters: HashMap<DeviceId, Arc<AtomicU8>> = HashMap::new();
 
-            for (cmd, resp_chan) in receiver {
-                match cmd {
-                    DeviceCommand::ListHosts => {
-                        resp_chan.send(DeviceResponse::Hosts(cpal::available_hosts())).unwrap();
-                    },
-                    DeviceCommand::ListInputs(host) => {
-                        let host = cpal::host_from_id(cpal::available_hosts()
-                                                      .into_iter()
-                                                      .find(|id| *id == host)
-                                                      .unwrap())
-                            .unwrap();
+        for (cmd, resp_chan) in receiver {
+            match cmd {
+                DeviceCommand::ListHosts => {
+                    resp_chan
+                        .send(DeviceResponse::Hosts(cpal::available_hosts()))
+                        .unwrap();
+                }
+                DeviceCommand::ListInputs(host) => {
+                    let host = cpal::host_from_id(
+                        cpal::available_hosts()
+                            .into_iter()
+                            .find(|id| *id == host)
+                            .unwrap(),
+                    )
+                    .unwrap();
 
-                        let devices = host.input_devices().unwrap()
-                                .filter_map(|d| d.name().ok())
-                                .collect::<Vec<_>>();
+                    let devices = host
+                        .input_devices()
+                        .unwrap()
+                        .filter_map(|d| d.name().ok())
+                        .collect::<Vec<_>>();
 
-                        resp_chan.send(DeviceResponse::Devices(devices)).unwrap();
-                    },
-                    DeviceCommand::ListOutputs(host) => {
-                        let host = cpal::host_from_id(cpal::available_hosts()
-                                                      .into_iter()
-                                                      .find(|id| *id == host)
-                                                      .unwrap())
-                            .unwrap();
+                    resp_chan.send(DeviceResponse::Devices(devices)).unwrap();
+                }
+                DeviceCommand::ListOutputs(host) => {
+                    let host = cpal::host_from_id(
+                        cpal::available_hosts()
+                            .into_iter()
+                            .find(|id| *id == host)
+                            .unwrap(),
+                    )
+                    .unwrap();
 
-                        let devices = host.output_devices().unwrap()
-                                .filter_map(|d| d.name().ok())
-                                .collect::<Vec<_>>();
+                    let devices = host
+                        .output_devices()
+                        .unwrap()
+                        .filter_map(|d| d.name().ok())
+                        .collect::<Vec<_>>();
 
-                        resp_chan.send(DeviceResponse::Devices(devices)).unwrap();
-                    },
-                    DeviceCommand::OpenInput(host, dev) => {
-                        tracing::info!("Opening input device {dev:?}");
-                        let host = cpal::host_from_id(cpal::available_hosts()
-                                                      .into_iter()
-                                                      .find(|id| *id == host)
-                                                      .unwrap())
-                            .unwrap();
+                    resp_chan.send(DeviceResponse::Devices(devices)).unwrap();
+                }
+                DeviceCommand::OpenInput(host, dev) => {
+                    tracing::info!("Opening input device {dev:?}");
+                    let host = cpal::host_from_id(
+                        cpal::available_hosts()
+                            .into_iter()
+                            .find(|id| *id == host)
+                            .unwrap(),
+                    )
+                    .unwrap();
 
-                        let device = host.input_devices().unwrap()
-                                .find(|d| d.name().ok().as_ref() == Some(&dev))
-                                .unwrap();
+                    let device = host
+                        .input_devices()
+                        .unwrap()
+                        .find(|d| d.name().ok().as_ref() == Some(&dev))
+                        .unwrap();
 
-                        let r = match input_stream(device) {
-                            Ok((stream, source)) => {
-                                stream.play().unwrap();
-                                let id = DeviceId::generate();
-                                devices.insert(id, stream);
+                    let r = match input_stream(device) {
+                        Ok((stream, source)) => {
+                            stream.play().unwrap();
+                            let id = DeviceId::generate();
+                            devices.insert(id, stream);
 
-                                Some((id, source))
-                            },
-                            Err(e) => {
-                                tracing::error!("Opening input failed: {:#}", e);
-                                None
-                            },
-                        };
-
-                        resp_chan.send(DeviceResponse::InputOpened(r)).unwrap();
-                    },
-                    DeviceCommand::OpenOutput(host, dev) => {
-                        tracing::info!("Opening output device {dev:?}");
-                        let host = cpal::host_from_id(cpal::available_hosts()
-                                                      .into_iter()
-                                                      .find(|id| *id == host)
-                                                      .unwrap())
-                            .unwrap();
-
-                        let device = host.output_devices().unwrap()
-                                .find(|d| d.name().ok().as_ref() == Some(&dev))
-                                .unwrap();
-
-                        let r = match output_stream(device) {
-                            Ok((stream, sink, resync)) => {
-                                stream.play().unwrap();
-                                let id = DeviceId::generate();
-                                devices.insert(id, stream);
-                                resync_counters.insert(id, resync);
-
-                                Some((id, sink))
-                            },
-                            Err(e) => {
-                                tracing::error!("Opening output failed: {:#}", e);
-                                None
-                            },
-                        };
-
-                        resp_chan.send(DeviceResponse::OutputOpened(r)).unwrap();
-                    },
-                    DeviceCommand::CloseDevice(dev) => {
-                        tracing::info!("Closing device {dev:?}");
-
-                        if let Some(dev) = devices.remove(&dev) {
-                            let _ = dev.pause();
+                            Some((id, source))
                         }
-
-                        resp_chan.send(DeviceResponse::DeviceClosed).unwrap();
-                    },
-                    DeviceCommand::TriggerResync => {
-                        for counter in resync_counters.values() {
-                            counter.fetch_add(5, std::sync::atomic::Ordering::Relaxed);
+                        Err(e) => {
+                            tracing::error!("Opening input failed: {:#}", e);
+                            None
                         }
+                    };
 
-                        resp_chan.send(DeviceResponse::Resynced).unwrap();
+                    resp_chan.send(DeviceResponse::InputOpened(r)).unwrap();
+                }
+                DeviceCommand::OpenOutput(host, dev) => {
+                    tracing::info!("Opening output device {dev:?}");
+                    let host = cpal::host_from_id(
+                        cpal::available_hosts()
+                            .into_iter()
+                            .find(|id| *id == host)
+                            .unwrap(),
+                    )
+                    .unwrap();
+
+                    let device = host
+                        .output_devices()
+                        .unwrap()
+                        .find(|d| d.name().ok().as_ref() == Some(&dev))
+                        .unwrap();
+
+                    let r = match output_stream(device) {
+                        Ok((stream, sink, resync)) => {
+                            stream.play().unwrap();
+                            let id = DeviceId::generate();
+                            devices.insert(id, stream);
+                            resync_counters.insert(id, resync);
+
+                            Some((id, sink))
+                        }
+                        Err(e) => {
+                            tracing::error!("Opening output failed: {:#}", e);
+                            None
+                        }
+                    };
+
+                    resp_chan.send(DeviceResponse::OutputOpened(r)).unwrap();
+                }
+                DeviceCommand::CloseDevice(dev) => {
+                    tracing::info!("Closing device {dev:?}");
+
+                    if let Some(dev) = devices.remove(&dev) {
+                        let _ = dev.pause();
                     }
+
+                    resp_chan.send(DeviceResponse::DeviceClosed).unwrap();
+                }
+                DeviceCommand::TriggerResync => {
+                    for counter in resync_counters.values() {
+                        counter.fetch_add(5, std::sync::atomic::Ordering::Relaxed);
+                    }
+
+                    resp_chan.send(DeviceResponse::Resynced).unwrap();
                 }
             }
-        });
+        }
+    });
 
-        sender
-    };
-}
+    sender
+});
 
 pub fn invoke(cmd: DeviceCommand) -> DeviceResponse {
     let (resp_in, resp_out) = oneshot::channel();

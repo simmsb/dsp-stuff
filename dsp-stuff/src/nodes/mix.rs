@@ -29,19 +29,16 @@ pub struct Mix {
 
 impl SimpleNode for Mix {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
-    fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
+    fn process(&self, inputs: ProcessInput, mut outputs: ProcessOutput) {
         let ratio = self.ratio.load(std::sync::atomic::Ordering::Relaxed);
 
-        let input_a_id = self.inputs.get("a").unwrap();
-        let input_b_id = self.inputs.get("b").unwrap();
-        let output_id = self.outputs.get("out").unwrap();
+        let input_a = inputs.get("a").unwrap();
+        let input_b = inputs.get("b").unwrap();
+        let output = outputs.get("out").unwrap();
 
-        let a = inputs.get(&input_a_id).unwrap();
-        let b = inputs.get(&input_b_id).unwrap();
-
-        a.iter()
-            .zip(b.iter())
+        input_a.iter()
+            .zip(input_b.iter())
             .map(|(a, b)| (b * ratio) + (a * (1.0 - ratio)))
-            .collect_slice(outputs.get_mut(&output_id).unwrap());
+            .collect_slice(output);
     }
 }

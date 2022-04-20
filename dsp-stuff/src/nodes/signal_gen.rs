@@ -83,13 +83,8 @@ impl SignalGen {
 
 impl SimpleNode for SignalGen {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
-    fn process(
-        &self,
-        _inputs: &HashMap<PortId, &[f32]>,
-        outputs: &mut HashMap<PortId, &mut [f32]>,
-    ) {
-        let output_id = self.outputs.get("out").unwrap();
-        let output = outputs.get_mut(&output_id).unwrap();
+    fn process(&self, _inputs: ProcessInput, mut outputs: ProcessOutput) {
+        let output = outputs.get("out").unwrap();
 
         let mode = self.mode.load(std::sync::atomic::Ordering::Relaxed);
 

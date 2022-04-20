@@ -57,15 +57,12 @@ fn chebyshev(input: &[f32], output: &mut [f32], level_pos: f32, level_neg: f32) 
 
 impl SimpleNode for Chebyshev {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
-    fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
+    fn process(&self, inputs: ProcessInput, mut outputs: ProcessOutput) {
         let level_pos = self.level_pos.load(std::sync::atomic::Ordering::Relaxed);
         let level_neg = self.level_neg.load(std::sync::atomic::Ordering::Relaxed);
 
-        let input_id = self.inputs.get("in").unwrap();
-        let output_id = self.outputs.get("out").unwrap();
-
-        let input = inputs.get(&input_id).unwrap();
-        let output = outputs.get_mut(&output_id).unwrap();
+        let input = inputs.get("in").unwrap();
+        let output = outputs.get("out").unwrap();
 
         chebyshev(input, output, level_pos, level_neg);
     }

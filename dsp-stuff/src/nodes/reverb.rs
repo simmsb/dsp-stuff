@@ -70,11 +70,9 @@ impl Reverb {
 
 impl SimpleNode for Reverb {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
-    fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
-        let input_id = self.inputs.get("in").unwrap();
-        let input = inputs.get(&input_id).unwrap();
-        let output_id = self.outputs.get("out").unwrap();
-        let output = outputs.get_mut(&output_id).unwrap();
+    fn process(&self, inputs: ProcessInput, mut outputs: ProcessOutput) {
+        let input = inputs.get("in").unwrap();
+        let output = outputs.get("out").unwrap();
 
         let mut guard = self.buffer.lock().unwrap();
 
@@ -87,7 +85,7 @@ impl SimpleNode for Reverb {
                 .iter()
                 .zip(view.iter())
                 .map(|(a, b)| a + b * decay)
-                .collect_slice(*output);
+                .collect_slice(output);
 
             guard.0.release(input.len());
         } else {

@@ -16,7 +16,6 @@ eframe = { version = "0.17.0", features = ["default_fonts", "persistence"], defa
 egui = "0.17.0"
 egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "536cadd810d631f410478596a7bc281a2171eab6" }
 itertools = "0.10.3"
-lazy_static = "1.4.0"
 oneshot = "0.1.3"
 rivulet = { git = "https://github.com/simmsb/rivulet", rev = "b2416e5e7eb87162d693c74ed62df33e252e9647" }
 tokio = { version = "1.17.0", features = ["rt", "time", "macros", "rt-multi-thread", "tracing", "sync"] }
@@ -36,6 +35,10 @@ dasp_peak = "0.11.0"
 simple_moving_average = "0.1.2"
 dsp-stuff-gpl = { git = "https://github.com/simmsb/dsp-stuff-gpl.git", optional = true, rev = "170f1680a08fd41379aa49bf88a1e4553d50929c" }
 clap = { version = "3.1.9", features = ["derive"] }
+auto_enums = "0.7.12"
+rsor = "0.1.3"
+sharded-slab = "0.1.4"
+once_cell = "1.10.0"
 # tracing-flame = { version = "0.2.0" }
 #native_helper = { git = "https://github.com/emilk/websocket_experiment.git" }
 

@@ -108,14 +108,11 @@ fn tanh(input: &[f32], output: &mut [f32], level: f32) {
 
 impl SimpleNode for Distort {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
-    fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
+    fn process(&self, inputs: ProcessInput, mut outputs: ProcessOutput) {
         let level = self.level.load(std::sync::atomic::Ordering::Relaxed);
 
-        let input_id = self.inputs.get("in").unwrap();
-        let output_id = self.outputs.get("out").unwrap();
-
-        let input = inputs.get(&input_id).unwrap();
-        let output = outputs.get_mut(&output_id).unwrap();
+        let input = inputs.get("in").unwrap();
+        let output = outputs.get("out").unwrap();
 
         let mode = self.mode.load(std::sync::atomic::Ordering::Relaxed);
 

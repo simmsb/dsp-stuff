@@ -88,6 +88,7 @@ fn do_node(dsp: &Dsp) -> darling::Result<TokenStream> {
     let render = do_render(&dsp.data, &dsp.custom_render, &dsp.after_settings_change)?;
     let (cfg_struct, save_restore) = do_save_restore(&dsp.ident, &dsp.data);
     let new = do_new(&dsp.inputs, &dsp.outputs, &dsp.data);
+    // let helpers = do_slider_as_input_helpers(&dsp.ident, &dsp.data);
 
     let ident = &dsp.ident;
     let tokens = quote! {
@@ -104,10 +105,41 @@ fn do_node(dsp: &Dsp) -> darling::Result<TokenStream> {
 
             #new
         }
+
+        // impl #ident {
+        //     #helpers
+        // }
     };
 
     Ok(tokens)
 }
+
+// fn do_slider_as_input_helpers(
+//     name: &syn::Ident,
+//     data: &ast::Data<darling::util::Ignored, FieldOpts>
+// ) -> TokenStream {
+//     let fields = data.as_ref().take_struct().unwrap();
+//     let slider_input_fields = fields
+//         .iter()
+//         .filter(|f| {
+//             f.slider.as_ref().map_or(false, |s| s.as_input.is_present())
+//         })
+//         .map(|f| {
+//             let ident = f.ident.as_ref().unwrap();
+//             let helper_name = quote::format_ident!("{}_input", ident);
+
+//             quote! {
+//                 #[::auto_enums::auto_enum(::std::iter::Iterator)]
+//                 fn #helper_name(&self, inputs: &::std::collections::HashMap) -> impl ::std::iter::Iterator<Item = f32> {
+
+//                 }
+//             }
+
+//         });
+
+
+//     todo!()
+// }
 
 fn do_new(
     inputs: &[String],
@@ -124,7 +156,9 @@ fn do_new(
         .unwrap();
     let inputs_field = fields
         .iter()
-        .find(|f| f.inputs.is_present())
+        .find(|f| {
+            f.inputs.is_present()
+        })
         .unwrap()
         .ident
         .as_ref()
@@ -136,6 +170,13 @@ fn do_new(
         .ident
         .as_ref()
         .unwrap();
+
+    let slider_input_fields = fields
+        .iter()
+        .filter(|f| {
+            f.slider.as_ref().map_or(false, |s| s.as_input.is_present())
+        })
+        .map(|f| f.ident.as_ref().unwrap());
 
     let field_defaulters = fields.iter().filter_map(|f| {
         if f.id.is_present() || f.inputs.is_present() || f.outputs.is_present() {
@@ -157,6 +198,7 @@ fn do_new(
         fn new(id: crate::ids::NodeId) -> Self {
             let inputs = crate::node::PortStorage::default();
             #(inputs.add(#inputs.to_owned());)*
+            #(inputs.add(#slider_input_fields.to_owned());)*
 
             let outputs = crate::node::PortStorage::default();
             #(outputs.add(#outputs.to_owned());)*

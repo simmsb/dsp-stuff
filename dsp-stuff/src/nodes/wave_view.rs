@@ -155,11 +155,10 @@ impl SimpleNode for WaveView {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(
         &self,
-        inputs: &HashMap<PortId, &[f32]>,
-        _outputs: &mut HashMap<PortId, &mut [f32]>,
+        inputs: ProcessInput,
+        _outputs: ProcessOutput,
     ) {
-        let input_id = self.inputs.get("in").unwrap();
-        let input = inputs.get(&input_id).unwrap();
+        let input = inputs.get("in").unwrap();
 
         let mut sink = self.view_sink.lock().unwrap();
 

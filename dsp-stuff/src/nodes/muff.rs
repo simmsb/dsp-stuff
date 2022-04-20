@@ -39,15 +39,13 @@ pub struct Muff {
 
 impl SimpleNode for Muff {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
-    fn process(&self, inputs: &HashMap<PortId, &[f32]>, outputs: &mut HashMap<PortId, &mut [f32]>) {
+    fn process(&self, inputs: ProcessInput, mut outputs: ProcessOutput) {
         let toan = self.toan.load(std::sync::atomic::Ordering::Relaxed);
         let level = self.level.load(std::sync::atomic::Ordering::Relaxed);
         let sustain = self.sustain.load(std::sync::atomic::Ordering::Relaxed);
 
-        let input_id = self.inputs.get("in").unwrap();
-        let input = inputs.get(&input_id).unwrap();
-        let output_id = self.outputs.get("out").unwrap();
-        let output = outputs.get_mut(&output_id).unwrap();
+        let input = inputs.get("in").unwrap();
+        let output = outputs.get("out").unwrap();
 
         let mut muff_state = self.state.lock().unwrap();
         perform(input, output, toan, level, sustain, &mut muff_state);

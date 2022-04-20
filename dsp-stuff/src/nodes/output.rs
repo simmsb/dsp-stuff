@@ -214,33 +214,34 @@ impl Node for Output {
 impl Perform for Output {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     async fn perform(&self, inputs: NodeInputs<'_, '_, '_>, _outputs: NodeOutputs<'_, '_, '_>) {
-        let buf_size = 128;
+        const BUF_SIZE: usize = 128;
+        let mut buf = [0.0; BUF_SIZE];
 
-        let collected_inputs = inputs.get_mut(&self.inputs.get("in").unwrap()).unwrap();
+        let collected_inputs = &mut inputs[self.inputs.get_idx("in").unwrap()];
 
-        let merged = collect_and_average(buf_size, collected_inputs).await;
+        collect_and_average(&mut buf, collected_inputs).await;
 
         let mut sink = self.sink.lock().await;
 
         if let Some(sink) = sink.as_mut() {
             // tracing::debug!(merged = merged.len(), "Done a collection");
 
-            sink.grant(buf_size).await.unwrap();
+            sink.grant(BUF_SIZE).await.unwrap();
 
             // tracing::debug!(sink_view = sink.view_mut().len(), "Got a grant");
 
-            sink.view_mut()[..buf_size].copy_from_slice(&merged);
+            sink.view_mut()[..BUF_SIZE].copy_from_slice(&buf);
 
             // tracing::debug!("Releasing sink");
-            sink.release(buf_size);
+            sink.release(BUF_SIZE);
 
             // tracing::debug!("Releasing inputs");
-            for input in inputs.values_mut() {
-                for in_ in input.iter_mut() {
-                    if in_.view().len() < buf_size {
+            for input_port in inputs.iter_mut() {
+                for input_pipe in input_port.iter_mut() {
+                    if input_pipe.view().len() < BUF_SIZE {
                         continue;
                     }
-                    in_.release(buf_size);
+                    input_pipe.release(BUF_SIZE);
                 }
             }
         }
