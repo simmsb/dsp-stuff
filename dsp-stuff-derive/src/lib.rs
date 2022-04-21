@@ -86,7 +86,7 @@ fn do_node(dsp: &Dsp) -> darling::Result<TokenStream> {
     let meta = do_meta(dsp);
     let getters = do_getters(&dsp.data)?;
     let render = do_render(&dsp.data, &dsp.custom_render, &dsp.after_settings_change)?;
-    let (cfg_struct, save_restore) = do_save_restore(&dsp.ident, &dsp.data);
+    let (cfg_struct, save_restore) = do_save_restore(&dsp.ident, &dsp.after_settings_change, &dsp.data);
     let new = do_new(&dsp.inputs, &dsp.outputs, &dsp.data);
     let helpers = do_slider_as_input_helpers(&dsp.data);
 
@@ -194,7 +194,7 @@ fn do_new(
         }
 
         let val = if let Some(v) = &f.default {
-            quote! { #v.into() }
+            quote! { (#v).into() }
         } else {
             quote! { ::std::default::Default::default() }
         };
@@ -227,6 +227,7 @@ fn do_new(
 
 fn do_save_restore(
     name: &syn::Ident,
+    after_settings_change: &Option<syn::Expr>,
     data: &ast::Data<darling::util::Ignored, FieldOpts>,
 ) -> (TokenStream, TokenStream) {
     let fields = data.as_ref().take_struct().unwrap();
@@ -310,6 +311,14 @@ fn do_save_restore(
         .as_ref()
         .unwrap();
 
+    let after_settings_change_expr = if let Some(e) = after_settings_change {
+        quote! {
+            (#e)(&this);
+        }
+    } else {
+        quote! {}
+    };
+
     let restore_defn = quote! {
         fn restore(value: ::serde_json::Value) -> Self {
             let cfg: #cfg_struct_name = serde_json::from_value(value).unwrap();
@@ -318,6 +327,8 @@ fn do_save_restore(
             let mut this = Self::new(id);
 
             #(#restore_setters)*
+
+            #after_settings_change_expr
 
             this
         }

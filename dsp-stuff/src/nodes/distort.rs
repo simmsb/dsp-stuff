@@ -19,6 +19,7 @@ enum Mode {
     SoftClip,
     Tanh,
     RecipSoftClip,
+    Fuzz,
 }
 
 #[derive(dsp_stuff_derive::DspNode)]
@@ -104,6 +105,34 @@ fn tanh(input: &[f32], output: &mut [f32], level: &[f32]) {
         .collect_slice(output);
 }
 
+fn fuzz(input: &[f32], output: &mut [f32], level: &[f32]) {
+    let mx = input
+        .iter()
+        .map(|x| x.abs())
+        .max_by(f32::total_cmp)
+        .unwrap();
+    let mut z = [0.0; BUF_SIZE];
+
+    input
+        .iter()
+        .zip(level)
+        .map(|(x, level)| {
+            let q = x * level / mx;
+            (1.0 - q.copysign(-1.0).exp()).copysign(-1.0)
+        })
+        .collect_slice(&mut z);
+
+    let mz = z.iter().map(|x| x.abs()).max_by(f32::total_cmp).unwrap();
+
+    let mut y = [0.0; BUF_SIZE];
+
+    z.iter().map(|x| x * mx / mz).collect_slice(&mut y);
+
+    let my = y.iter().map(|x| x.abs()).max_by(f32::total_cmp).unwrap();
+
+    y.iter().map(|x| x * mx / my).collect_slice(output);
+}
+
 impl SimpleNode for Distort {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn process(&self, inputs: ProcessInput, mut outputs: ProcessOutput) {
@@ -118,6 +147,7 @@ impl SimpleNode for Distort {
             Mode::SoftClip => soft_clip(input, output, &level),
             Mode::Tanh => tanh(input, output, &level),
             Mode::RecipSoftClip => recip_soft_clip(input, output, &level),
+            Mode::Fuzz => fuzz(input, output, &level),
         }
     }
 }

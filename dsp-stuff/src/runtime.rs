@@ -577,10 +577,6 @@ impl LinkInstance {
     fn resync(&self) {
         use rivulet::View;
 
-        let mut sink = self.sink.blocking_lock();
-        let len = sink.view().len();
-        sink.release(len);
-
         let mut source = self.source.blocking_lock();
         let len = source.view().len();
         source.release(len);

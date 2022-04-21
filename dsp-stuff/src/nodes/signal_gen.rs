@@ -46,7 +46,7 @@ pub struct SignalGen {
 
     clock: Atomic<f32>,
 
-    #[dsp(select, default = "Mode::Sine")]
+    #[dsp(select, default = "Mode::Sine", save)]
     mode: Atomic<Mode>,
 }
 

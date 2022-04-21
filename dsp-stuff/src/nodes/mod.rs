@@ -5,6 +5,7 @@ use crate::{
     node::{Node, Perform},
 };
 
+pub mod biquad;
 pub mod chebyshev;
 pub mod distort;
 pub mod envelope;
@@ -13,6 +14,7 @@ pub mod high_pass;
 pub mod input;
 pub mod low_pass;
 pub mod mix;
+pub mod add;
 #[cfg(feature = "gpl_effects")]
 pub mod muff;
 pub mod output;
@@ -26,7 +28,9 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<dyn Perform>)] = &[
     ("Output", |id| Arc::new(output::Output::new(id))),
     ("Gain", |id| Arc::new(gain::Gain::new(id))),
     ("Mix", |id| Arc::new(mix::Mix::new(id))),
+    ("Add", |id| Arc::new(add::Add::new(id))),
     ("Distort", |id| Arc::new(distort::Distort::new(id))),
+    ("Biquad", |id| Arc::new(biquad::BiQuad::new(id))),
     #[cfg(feature = "gpl_effects")]
     ("Muff", |id| Arc::new(muff::Muff::new(id))),
     ("Chebyshev", |id| Arc::new(chebyshev::Chebyshev::new(id))),
@@ -46,7 +50,9 @@ pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<dyn Perform>)] = &[
     ("output", |v| Arc::new(output::Output::restore(v))),
     ("gain", |v| Arc::new(gain::Gain::restore(v))),
     ("mix", |v| Arc::new(mix::Mix::restore(v))),
+    ("add", |v| Arc::new(add::Add::restore(v))),
     ("distort", |v| Arc::new(distort::Distort::restore(v))),
+    ("biquad", |v| Arc::new(biquad::BiQuad::restore(v))),
     #[cfg(feature = "gpl_effects")]
     ("muff", |v| Arc::new(muff::Muff::restore(v))),
     ("chebyshev", |v| Arc::new(chebyshev::Chebyshev::restore(v))),
