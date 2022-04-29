@@ -20,6 +20,10 @@ enum Mode {
     Tanh,
     RecipSoftClip,
     Fuzz,
+    Sin,
+    Atan,
+    Square,
+    Chebyshev4,
 }
 
 #[derive(dsp_stuff_derive::DspNode)]
@@ -62,12 +66,11 @@ fn do_soft_clip(sample: f32, level: f32) -> f32 {
     sample / level
 }
 
-fn soft_clip(input: &[f32], output: &mut [f32], level: &[f32]) {
+fn apply(f: fn(f32, f32) -> f32, input: &[f32], output: &mut [f32], level: &[f32]) {
     input
         .iter()
-        .copied()
         .zip(level)
-        .map(|(x, level)| do_soft_clip(x, *level))
+        .map(|(x, level)| f(*x, *level))
         .collect_slice(output);
 }
 
@@ -79,15 +82,6 @@ fn do_recip_soft_clip(sample: f32, level: f32) -> f32 {
     sample.signum() * (1.0 - 1.0 / (sample.abs() * level + 1.0))
 }
 
-fn recip_soft_clip(input: &[f32], output: &mut [f32], level: &[f32]) {
-    input
-        .iter()
-        .copied()
-        .zip(level)
-        .map(|(x, level)| do_recip_soft_clip(x, *level))
-        .collect_slice(output);
-}
-
 fn do_tanh(sample: f32, level: f32) -> f32 {
     if level < 0.001 {
         return sample;
@@ -96,13 +90,38 @@ fn do_tanh(sample: f32, level: f32) -> f32 {
     (sample * level).tanh()
 }
 
-fn tanh(input: &[f32], output: &mut [f32], level: &[f32]) {
-    input
-        .iter()
-        .copied()
-        .zip(level)
-        .map(|(x, level)| do_tanh(x, *level))
-        .collect_slice(output);
+fn do_sin(sample: f32, level: f32) -> f32 {
+    if level < 0.001 {
+        return sample;
+    }
+
+    (sample * level).sin()
+}
+
+fn do_atan(sample: f32, level: f32) -> f32 {
+    if level < 0.001 {
+        return sample;
+    }
+
+    (sample * level).atan()
+}
+
+fn do_sqr(sample: f32, level: f32) -> f32 {
+    if level < 0.001 {
+        return sample;
+    }
+
+    (sample * level).powi(2) * (sample * level).signum()
+}
+
+fn do_cheb_4(sample: f32, level: f32) -> f32 {
+    if level < 0.001 {
+        return sample;
+    }
+
+    let v = sample * level;
+
+    8.0 * v.powi(4) - 8.0 * v.powi(2) + 1.0
 }
 
 fn fuzz(input: &[f32], output: &mut [f32], level: &[f32]) {
@@ -144,10 +163,14 @@ impl SimpleNode for Distort {
         let mode = self.mode.load(std::sync::atomic::Ordering::Relaxed);
 
         match mode {
-            Mode::SoftClip => soft_clip(input, output, &level),
-            Mode::Tanh => tanh(input, output, &level),
-            Mode::RecipSoftClip => recip_soft_clip(input, output, &level),
+            Mode::SoftClip => apply(do_soft_clip, input, output, &level),
+            Mode::Tanh => apply(do_tanh, input, output, &level),
+            Mode::RecipSoftClip => apply(do_recip_soft_clip, input, output, &level),
             Mode::Fuzz => fuzz(input, output, &level),
+            Mode::Sin => apply(do_sin, input, output, &level),
+            Mode::Atan => apply(do_atan, input, output, &level),
+            Mode::Square => apply(do_sqr, input, output, &level),
+            Mode::Chebyshev4 => apply(do_cheb_4, input, output, &level),
         }
     }
 }
