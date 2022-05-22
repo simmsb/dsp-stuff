@@ -9,9 +9,8 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
       matrix:
-        target: [x86_64-unknown-linux-musl, x86_64-pc-windows-gnu, x86_64-apple-darwin]
+        target: [x86_64-unknown-linux-musl, x86_64-pc-windows-gnu]
     steps:
       - uses: actions/checkout@master
       - name: Compile
