@@ -20,7 +20,7 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev mingw-64
+          sudo apt-get install -y libasound2-dev mingw-w64
       - uses: actions/checkout@master
       - uses: actions/cache@v1
         with:
