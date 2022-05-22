@@ -11,18 +11,39 @@ jobs:
     strategy:
       matrix:
         target: [x86_64-unknown-linux-musl, x86_64-pc-windows-gnu]
+        include:
+          - target: x86_64-unknown-linux-musl
+            suffix: ''
+          - target: x86_64-pc-windows-gnu
+            suffix: .exe
     steps:
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev mingw-64
       - uses: actions/checkout@master
-      - name: Compile
-        id: compile
-        uses: rust-build/rust-build.action@v1.3.2
+      - uses: actions/cache@v1
         with:
-          RUSTTARGET: ${{ matrix.target }}
-          UPLOAD_MODE: none
+          path: ~/.cargo/registry
+          key: '${{ runner.os }}-cargo-registry-${{ hashFiles(''**/Cargo.lock'') }}'
+      - uses: actions/cache@v1
+        with:
+          path: ~/.cargo/git
+          key: '${{ runner.os }}-cargo-index-${{ hashFiles(''**/Cargo.lock'') }}'
+      - uses: actions/cache@v1
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target ${{ matrix.target }}
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: Binary
-          path: |
-            ${{ steps.compile.outputs.BUILT_ARCHIVE }}
-            ${{ steps.compile.outputs.BUILT_CHECKSUM }}
+          name: build-${{ matrix.target }}
+          path: ./target/${{ matrix.target}}/release/dsp-stuff${{ matrix.suffix }}
