@@ -17,6 +17,8 @@ use crate::{ids::NodeId, node::*};
 #[repr(u8)]
 enum Mode {
     Sine,
+    Triangle,
+    Square,
     Constant,
 }
 
@@ -68,6 +70,38 @@ impl SignalGen {
             .store((clock + total) % 1.0, std::sync::atomic::Ordering::Relaxed);
     }
 
+    fn do_triangle(&self, output: &mut [f32], amplitude: &[f32], frequency: &[f32]) {
+        let clock = self.clock.load(std::sync::atomic::Ordering::Relaxed);
+
+        let sample_rate = 48000.0;
+        let mut total = 0.0;
+
+        for ((v, amplitude), frequency) in output.iter_mut().zip(amplitude).zip(frequency) {
+            let step = frequency / sample_rate;
+            total += step;
+            *v = (2.0 * ((clock + total) % 1.0) - 1.0) * amplitude;
+        }
+
+        self.clock
+            .store((clock + total) % 1.0, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn do_square(&self, output: &mut [f32], amplitude: &[f32], frequency: &[f32]) {
+        let clock = self.clock.load(std::sync::atomic::Ordering::Relaxed);
+
+        let sample_rate = 48000.0;
+        let mut total = 0.0;
+
+        for ((v, amplitude), frequency) in output.iter_mut().zip(amplitude).zip(frequency) {
+            let step = frequency / sample_rate;
+            total += step;
+            *v = (if total > 0.5 { 1.0 } else { -1.0 }) * amplitude;
+        }
+
+        self.clock
+            .store((clock + total) % 1.0, std::sync::atomic::Ordering::Relaxed);
+    }
+
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn do_const(&self, output: &mut [f32], amplitude: &[f32]) {
         output.copy_from_slice(amplitude);
@@ -89,6 +123,8 @@ impl SimpleNode for SignalGen {
         match mode {
             Mode::Sine => self.do_sine(output, &amplitude, &frequency),
             Mode::Constant => self.do_const(output, &amplitude),
+            Mode::Triangle => self.do_triangle(output, &amplitude, &frequency),
+            Mode::Square => self.do_square(output, &amplitude, &frequency),
         }
     }
 }

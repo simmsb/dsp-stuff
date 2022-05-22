@@ -431,8 +431,8 @@ impl UiContext {
     }
 }
 
-impl eframe::epi::App for UiContext {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::epi::Frame) {
+impl eframe::App for UiContext {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         let _guard = self.runtime.enter();
 
         let mut visuals = if self.theme.dark {

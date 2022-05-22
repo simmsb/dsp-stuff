@@ -20,9 +20,9 @@ dasp_peak = "0.11.0"
 derivative = "2.2.0"
 dsp-stuff-derive = { path = "../dsp-stuff-derive/" }
 dsp-stuff-gpl = { git = "https://github.com/simmsb/dsp-stuff-gpl.git", optional = true, rev = "170f1680a08fd41379aa49bf88a1e4553d50929c" }
-eframe = { version = "0.17.0", features = ["default_fonts", "persistence"], default-features = false }
-egui = "0.17.0"
-egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "536cadd810d631f410478596a7bc281a2171eab6" }
+eframe = { version = "0.18.0", features = ["default_fonts", "persistence"], default-features = false }
+egui = "0.18"
+egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "6e99583ba7159defa7d61932525bb1ad3f97023f" }
 itertools = "0.10.3"
 once_cell = "1.10.0"
 oneshot = "0.1.3"

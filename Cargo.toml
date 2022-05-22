@@ -5,7 +5,7 @@ members = [
 ]
 default-members = ["dsp-stuff"]
 
-[patch.crates-io]
-egui = { git = "https://github.com/emilk/egui", rev = "2d2022fb7290bf4fcca373ad3a0dc98b680a9203" }
-egui_glow = { git = "https://github.com/emilk/egui", rev = "2d2022fb7290bf4fcca373ad3a0dc98b680a9203" }
-eframe = { git = "https://github.com/emilk/egui", rev = "2d2022fb7290bf4fcca373ad3a0dc98b680a9203" }
+# [patch.crates-io]
+# egui = { git = "https://github.com/emilk/egui", rev = "2d2022fb7290bf4fcca373ad3a0dc98b680a9203" }
+# egui_glow = { git = "https://github.com/emilk/egui", rev = "2d2022fb7290bf4fcca373ad3a0dc98b680a9203" }
+# eframe = { git = "https://github.com/emilk/egui", rev = "2d2022fb7290bf4fcca373ad3a0dc98b680a9203" }
