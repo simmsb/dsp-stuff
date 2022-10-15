@@ -42,7 +42,7 @@ pub struct Distort {
     #[dsp(outputs)]
     outputs: PortStorage,
 
-    #[dsp(slider(range = "0.0..=10.0", as_input), save)]
+    #[dsp(slider(range = "0.0..=30.0", as_input), save)]
     level: Atomic<f32>,
 
     #[dsp(select, save, default = "Mode::SoftClip")]
