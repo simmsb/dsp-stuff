@@ -248,7 +248,7 @@ impl UiContext {
                         );
                         ui.label(format!("{} ({})", node.instance.title(), node.id.get()))
                             .on_hover_text_at_pointer(node.instance.description());
-                        inner_ui.with_layout(egui::Layout::right_to_left(), move |ui| {
+                        inner_ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), move |ui| {
                             if ui.add(egui::Button::new("Close")).clicked() {
                                 nodes_to_delete.borrow_mut().push(node.id);
                             }

@@ -74,4 +74,6 @@ fn main() -> color_eyre::Result<()> {
         options,
         Box::new(move |cc| Box::new(runtime::UiContext::new(cc, &params))),
     );
+
+    Ok(())
 }

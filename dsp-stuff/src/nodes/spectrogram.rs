@@ -233,7 +233,7 @@ impl Perform for Spectrogram {
 
         let mut processor = Processor::from_raw_data(
             ProcessorConfig {
-                sample_rate: 48000,
+                sampling_rate: 48000,
                 frequency_bounds: [lower_bound, upper_bound],
                 resolution: None, //Some(100),
                 volume: 1.0,
