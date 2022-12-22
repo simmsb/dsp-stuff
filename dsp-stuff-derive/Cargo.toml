@@ -9,10 +9,10 @@ proc-macro = true
 path = "src/lib.rs"
 
 [dependencies]
-darling = "0.14.1"
+darling = "0.14.2"
 proc-macro2 = "1.0.47"
 quote = "1.0.21"
-syn = { version = "1.0.102", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
+syn = { version = "1.0.105", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 
 [package.metadata.hackerman.stash.dependencies]
 syn = "1.0.102"
