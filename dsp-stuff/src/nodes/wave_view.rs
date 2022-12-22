@@ -65,18 +65,6 @@ impl Node for WaveView {
         serde_json::to_value(cfg).unwrap()
     }
 
-    fn restore(value: serde_json::Value) -> Self
-    where
-        Self: Sized,
-    {
-        let cfg: WaveViewConfig = serde_json::from_value(value).unwrap();
-
-        let mut this = Self::new(cfg.id);
-        this.inputs = PortStorage::new(cfg.inputs);
-
-        this
-    }
-
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn render(&self, ui: &mut egui::Ui) {
         let mut source = self.view_source.lock().unwrap();
@@ -131,6 +119,20 @@ impl Node for WaveView {
         ui.label(format!("Samples per frame: {}", samples_this_render));
 
         source.release(samples_this_render);
+    }
+}
+
+impl NodeStatic for WaveView {
+    fn restore(value: serde_json::Value) -> Self
+    where
+        Self: Sized,
+    {
+        let cfg: WaveViewConfig = serde_json::from_value(value).unwrap();
+
+        let mut this = Self::new(cfg.id);
+        this.inputs = PortStorage::new(cfg.inputs);
+
+        this
     }
 
     fn new(id: NodeId) -> Self {

@@ -1,8 +1,8 @@
 use crate::{
     devices,
     ids::{LinkId, NodeId, PortId},
-    node::Perform,
-    nodes,
+    node::{Perform, Node},
+    nodes::{self, Nodes},
     theme::{self, Theme},
     Params,
 };
@@ -248,11 +248,14 @@ impl UiContext {
                         );
                         ui.label(format!("{} ({})", node.instance.title(), node.id.get()))
                             .on_hover_text_at_pointer(node.instance.description());
-                        inner_ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), move |ui| {
-                            if ui.add(egui::Button::new("Close")).clicked() {
-                                nodes_to_delete.borrow_mut().push(node.id);
-                            }
-                        })
+                        inner_ui.with_layout(
+                            egui::Layout::right_to_left(egui::Align::Center),
+                            move |ui| {
+                                if ui.add(egui::Button::new("Close")).clicked() {
+                                    nodes_to_delete.borrow_mut().push(node.id);
+                                }
+                            },
+                        )
                     })
                     .response
                 })
@@ -397,7 +400,7 @@ impl UiContext {
         }
     }
 
-    fn add_node(&mut self, id: NodeId, instance: Arc<dyn Perform>) {
+    fn add_node(&mut self, id: NodeId, instance: Arc<Nodes>) {
         let inst = NodeInstance::new(id, instance);
         for port in inst.instance.inputs().0.read().unwrap().ports.values() {
             self.inputs.insert((inst.id, *port), HashSet::new());
@@ -449,6 +452,11 @@ impl eframe::App for UiContext {
         visuals.widgets.inactive.bg_fill = self.theme.grid_background;
 
         ctx.set_visuals(visuals);
+
+        // let mut style = (*ctx.style()).clone();
+        // style.debug.show_blocking_widget = true;
+        // style.debug.show_interactive_widgets = true;
+        // ctx.set_style(style);
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
@@ -585,7 +593,7 @@ impl LinkInstance {
 
 struct NodeInstance {
     id: NodeId,
-    instance: Arc<dyn Perform>,
+    instance: Arc<Nodes>,
     position: egui::Pos2,
     task: Option<(
         tokio::task::JoinHandle<()>,
@@ -602,7 +610,7 @@ struct NodeConfig {
 }
 
 impl NodeInstance {
-    fn new(id: NodeId, instance: Arc<dyn Perform>) -> Self {
+    fn new(id: NodeId, instance: Arc<Nodes>) -> Self {
         Self {
             id,
             instance,
@@ -706,7 +714,8 @@ impl NodeInstance {
                 .collect_vec();
 
             loop {
-                let mut perform = instance.perform(&mut input_slices, &mut output_slices);
+                let perform = instance.perform(&mut input_slices, &mut output_slices);
+                tokio::pin!(perform);
 
                 tokio::select! {
                     _ = &mut cancel_out => {

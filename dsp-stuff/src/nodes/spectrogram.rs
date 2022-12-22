@@ -75,25 +75,6 @@ impl Node for Spectrogram {
         serde_json::to_value(cfg).unwrap()
     }
 
-    fn restore(value: serde_json::Value) -> Self
-    where
-        Self: Sized,
-    {
-        let cfg: SpectrogramConfig = serde_json::from_value(value).unwrap();
-
-        let mut this = Self::new(cfg.id);
-        this.inputs = PortStorage::new(cfg.inputs);
-        this.buffer_size
-            .store(cfg.buffer_size, atomig::Ordering::Relaxed);
-        this.fft_size.store(cfg.fft_size, atomig::Ordering::Relaxed);
-        this.upper_bound
-            .store(cfg.upper_bound, atomig::Ordering::Relaxed);
-        this.lower_bound
-            .store(cfg.lower_bound, atomig::Ordering::Relaxed);
-
-        this
-    }
-
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn render(&self, ui: &mut egui::Ui) {
         let lower_bound = self.lower_bound.load(atomig::Ordering::Relaxed);
@@ -201,7 +182,9 @@ impl Node for Spectrogram {
             }
         });
     }
+}
 
+impl NodeStatic for Spectrogram {
     fn new(id: NodeId) -> Self {
         let inputs = PortStorage::default();
         inputs.add("in".to_owned());
@@ -217,9 +200,27 @@ impl Node for Spectrogram {
             upper_bound: Atomic::new(20_000),
         }
     }
+
+    fn restore(value: serde_json::Value) -> Self
+    where
+        Self: Sized,
+    {
+        let cfg: SpectrogramConfig = serde_json::from_value(value).unwrap();
+
+        let mut this = Self::new(cfg.id);
+        this.inputs = PortStorage::new(cfg.inputs);
+        this.buffer_size
+            .store(cfg.buffer_size, atomig::Ordering::Relaxed);
+        this.fft_size.store(cfg.fft_size, atomig::Ordering::Relaxed);
+        this.upper_bound
+            .store(cfg.upper_bound, atomig::Ordering::Relaxed);
+        this.lower_bound
+            .store(cfg.lower_bound, atomig::Ordering::Relaxed);
+
+        this
+    }
 }
 
-#[async_trait::async_trait]
 impl Perform for Spectrogram {
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     async fn perform(&self, inputs: NodeInputs<'_, '_, '_>, _outputs: NodeOutputs<'_, '_, '_>) {

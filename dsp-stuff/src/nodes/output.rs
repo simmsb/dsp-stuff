@@ -110,28 +110,6 @@ impl Node for Output {
         serde_json::to_value(cfg).unwrap()
     }
 
-    fn restore(value: serde_json::Value) -> Self
-    where
-        Self: Sized,
-    {
-        let cfg: OutputConfig = serde_json::from_value(value).unwrap();
-
-        let mut this = Self::new(cfg.id);
-
-        if let Some(host) = devices::invoke(devices::DeviceCommand::ListHosts)
-            .hosts()
-            .unwrap()
-            .into_iter()
-            .find(|x| x.name() == cfg.selected_host)
-        {
-            this.load_device(host, cfg.selected_device);
-        };
-
-        this.inputs = PortStorage::new(cfg.inputs);
-
-        this
-    }
-
     #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     fn render(&self, ui: &mut egui::Ui) {
         let current_host = **self.selected_host.load();
@@ -182,7 +160,9 @@ impl Node for Output {
             self.load_device(selected_host, selected_device);
         }
     }
+}
 
+impl NodeStatic for Output {
     fn new(id: NodeId) -> Self {
         let hosts = devices::invoke(devices::DeviceCommand::ListHosts)
             .hosts()
@@ -208,11 +188,32 @@ impl Node for Output {
             selected_device: ArcSwap::new(Arc::new(None)),
         }
     }
+
+    fn restore(value: serde_json::Value) -> Self
+    where
+        Self: Sized,
+    {
+        let cfg: OutputConfig = serde_json::from_value(value).unwrap();
+
+        let mut this = Self::new(cfg.id);
+
+        if let Some(host) = devices::invoke(devices::DeviceCommand::ListHosts)
+            .hosts()
+            .unwrap()
+            .into_iter()
+            .find(|x| x.name() == cfg.selected_host)
+        {
+            this.load_device(host, cfg.selected_device);
+        };
+
+        this.inputs = PortStorage::new(cfg.inputs);
+
+        this
+    }
 }
 
-#[async_trait::async_trait]
 impl Perform for Output {
-    #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
+    // #[tracing::instrument(level = "TRACE", skip_all, fields(node_id = self.id.get()))]
     async fn perform(&self, inputs: NodeInputs<'_, '_, '_>, _outputs: NodeOutputs<'_, '_, '_>) {
         const BUF_SIZE: usize = 128;
         let mut buf = [0.0; BUF_SIZE];

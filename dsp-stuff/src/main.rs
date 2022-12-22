@@ -1,4 +1,5 @@
 #![allow(clippy::type_complexity)]
+#![feature(async_fn_in_trait)]
 
 use clap::Parser;
 

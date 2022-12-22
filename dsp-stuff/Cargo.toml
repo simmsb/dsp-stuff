@@ -6,13 +6,13 @@ edition = "2021"
 
 [dependencies]
 arc-swap = { version = "1.5.1", features = [ "serde" ] }
-async-trait = "0.1.59"
+async-trait = "0.1.60"
 atomig = { version = "0.4.0", features = ["derive", "serde"] }
 audioviz = { version = "0.5.0", features = ["spectrum", "processor"], default-features = false }
 biquad = "0.4.2"
 bitvec = "1.0.1"
-cc = { version = "1.0.77", features = ["parallel"], default-features = false }
-clap = { version = "4.0.29", features = ["derive"] }
+cc = { version = "1.0.78", features = ["parallel"], default-features = false }
+clap = { version = "4.0.30", features = ["derive"] }
 collect_slice = "1.2.0"
 color-eyre = "0.6.2"
 console-subscriber = { version = "0.1.8", optional = true }
@@ -24,7 +24,9 @@ dsp-stuff-derive = { path = "../dsp-stuff-derive/" }
 dsp-stuff-gpl = { git = "https://github.com/simmsb/dsp-stuff-gpl.git", optional = true, rev = "170f1680a08fd41379aa49bf88a1e4553d50929c" }
 eframe = { version = "0.20.1", features = ["default_fonts", "persistence", "glow", "accesskit"], default-features = false }
 egui = "0.20.1"
-egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "3a64d0a16ecbfd92d1f4a4435d60bceec0d21bd9" }
+# egui_nodes = { path = "../../egui_nodes/" }
+egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "cc79d0dc505ee930ded25430f4255aaa3060b6bf" }
+enum_dispatch = { git = "https://github.com/simmsb/enum_dispatch_async.git", rev = "4229f5ae3c085098600dde2a1d8760f69cc13784" }
 getrandom = { version = "0.2.8", features = ["js", "std"], default-features = false }
 itertools = "0.10.5"
 memchr = { version = "2.5.0", features = ["use_std"] }
@@ -33,8 +35,8 @@ oneshot = "0.1.5"
 rfd = { version = "0.10.0", features = ["xdg-portal"], default-features = false }
 rivulet = { git = "https://github.com/simmsb/rivulet", rev = "b2416e5e7eb87162d693c74ed62df33e252e9647" }
 rsor = "0.1.3"
-serde = { version = "1.0.150", features = ["derive", "rc"] }
-serde_json = "1.0.89"
+serde = { version = "1.0.151", features = ["derive", "rc"] }
+serde_json = "1.0.91"
 sharded-slab = "0.1.4"
 simple_moving_average = "0.1.2"
 strum = { version = "0.24.1", features = ["derive"] }

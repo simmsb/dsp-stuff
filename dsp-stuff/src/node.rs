@@ -101,6 +101,7 @@ impl PortStorage {
     }
 }
 
+#[enum_dispatch::enum_dispatch]
 pub trait Node: Send + Sync {
     fn title(&self) -> &'static str;
 
@@ -108,21 +109,23 @@ pub trait Node: Send + Sync {
 
     fn description(&self) -> &'static str;
 
-    fn id(&self) -> NodeId;
+    fn id(&self) -> crate::ids::NodeId;
 
     /// The ids and names of the input nodes
-    fn inputs(&self) -> &PortStorage;
+    fn inputs(&self) -> &crate::node::PortStorage;
 
     /// The ids and names of the output nodes
-    fn outputs(&self) -> &PortStorage;
+    fn outputs(&self) -> &crate::node::PortStorage;
 
     fn render(&self, ui: &mut egui::Ui);
 
+    fn save(&self) -> serde_json::Value;
+}
+
+pub trait NodeStatic: {
     fn new(id: NodeId) -> Self
     where
         Self: Sized;
-
-    fn save(&self) -> serde_json::Value;
 
     fn restore(value: serde_json::Value) -> Self
     where
@@ -142,14 +145,16 @@ pub trait SimpleNode: Node {
     fn process(&self, inputs: ProcessInput, outputs: ProcessOutput);
 }
 
-#[async_trait::async_trait]
+#[enum_dispatch::enum_dispatch]
 pub trait Perform: Node {
     /// Perform this node
     ///
     /// This function may await things for as long as it likes, however it
     /// should probably way of quitting early if the node is modified in some
     /// way.
-    async fn perform(&self, inputs: NodeInputs<'_, '_, '_>, outputs: NodeOutputs<'_, '_, '_>);
+    async fn perform(&self,
+                     inputs: crate::node::NodeInputs<'_, '_, '_>,
+                     outputs: crate::node::NodeOutputs<'_, '_, '_>);
 }
 
 pub async fn collect_and_average(
@@ -259,7 +264,6 @@ fn drop_key_<T: Clear + Default>(x: RefMut<T>) -> usize {
     x.key()
 }
 
-#[async_trait::async_trait]
 impl<T: SimpleNode> Perform for T {
     async fn perform(&self, inputs: NodeInputs<'_, '_, '_>, outputs: NodeOutputs<'_, '_, '_>) {
         // prep outputs
