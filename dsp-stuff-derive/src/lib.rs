@@ -431,7 +431,7 @@ fn do_getters(data: &ast::Data<darling::util::Ignored, FieldOpts>) -> darling::R
 
 fn do_render(
     data: &ast::Data<darling::util::Ignored, FieldOpts>,
-    custom_renderer: &SpannedValue<Option<syn::Expr>>,
+    custom_render: &SpannedValue<Option<syn::Expr>>,
     after_settings_change: &Option<syn::Expr>,
 ) -> darling::Result<TokenStream> {
     let fields = data.as_ref().take_struct().unwrap();
@@ -532,23 +532,23 @@ fn do_render(
         })
         .collect::<Vec<_>>();
 
-    if custom_renderer.is_some() && !rendered_fields.is_empty() {
+    // if custom_render.is_some() && !rendered_fields.is_empty() {
+    //     errors.push(
+    //         darling::Error::custom(
+    //             "Don't use rendering related fields if you're passing a custom renderer",
+    //         )
+    //         .with_span(&custom_render.span()),
+    //     );
+    // }
+
+    if custom_render.is_some() && after_settings_change.is_some() {
         errors.push(
-            darling::Error::custom(
-                "Don't use rendering related fields if you're passing a custom renderer",
-            )
-            .with_span(&custom_renderer.span()),
+            darling::Error::custom("Don't mix after_settings_change and custom_render")
+                .with_span(&custom_render.span()),
         );
     }
 
-    if custom_renderer.is_some() && after_settings_change.is_some() {
-        errors.push(
-            darling::Error::custom("Don't mix after_settings_change and custom_renderer")
-                .with_span(&custom_renderer.span()),
-        );
-    }
-
-    if let Some(f) = custom_renderer.as_ref() {
+    if let Some(f) = custom_render.as_ref() {
         rendered_fields.push(quote! {
             (#f)(self, ui);
         });

@@ -18,7 +18,10 @@ color-eyre = "0.6.2"
 console-subscriber = { version = "0.1.8", optional = true }
 cpal = { version = "0.14.2", features = ["jack"] }
 dasp_envelope = { version = "0.11.0", features = ["peak"] }
+dasp_interpolate = { version = "0.11.0", features = ["sinc"] }
 dasp_peak = "0.11.0"
+dasp_ring_buffer = "0.11.0"
+dasp_signal = "0.11.0"
 derivative = "2.2.0"
 dsp-stuff-derive = { path = "../dsp-stuff-derive/" }
 dsp-stuff-gpl = { git = "https://github.com/simmsb/dsp-stuff-gpl.git", optional = true, rev = "170f1680a08fd41379aa49bf88a1e4553d50929c" }
@@ -40,6 +43,8 @@ serde_json = "1.0.91"
 sharded-slab = "0.1.4"
 simple_moving_average = "0.1.2"
 strum = { version = "0.24.1", features = ["derive"] }
+symphonia = { version = "0.5.1", default-features = false, features = ["wav", "pcm"] }
+symphonia-core = "0.5.1"
 tokio = { version = "1.23.0", features = ["rt", "time", "macros", "rt-multi-thread", "tracing", "sync"] }
 tracing = "0.1.37"
 tracing-error = "0.2.0"
