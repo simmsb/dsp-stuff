@@ -1,13 +1,18 @@
 use std::{
     collections::HashMap,
+    iter::{self, zip},
     sync::{atomic::AtomicU8, Arc},
 };
 
 use collect_slice::CollectSlice;
+use color_eyre::{Help, SectionExt};
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     Sample, SampleRate,
 };
+use dasp_interpolate::sinc::Sinc;
+use dasp_ring_buffer::Fixed;
+use dasp_signal::{interpolate::Converter, Signal};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use rivulet::{
@@ -329,15 +334,56 @@ fn input_stream(
     Ok((stream, source.into_view()))
 }
 
-fn do_write_1<T: Sample>(
+struct CountingSignal {
+    index: usize,
+    inner: Vec<f32>,
+}
+
+impl CountingSignal {
+    fn new() -> Self {
+        Self {
+            index: 0,
+            inner: Vec::new(),
+        }
+    }
+
+    fn prep(&mut self, buf: &[f32]) {
+        self.inner.clear();
+        self.inner.extend_from_slice(buf);
+        self.index = 0;
+    }
+}
+
+impl dasp_signal::Signal for CountingSignal {
+    type Frame = f32;
+
+    fn next(&mut self) -> Self::Frame {
+        if let Some(x) = self.inner.get(self.index) {
+            self.index += 1;
+            *x
+        } else {
+            0.0
+        }
+    }
+
+    fn is_exhausted(&self) -> bool {
+        self.index > self.inner.len()
+    }
+}
+
+fn do_write_1<T: Sample + dasp_frame::Frame>(
     data: &mut [T],
     source: &mut splittable::View<Source<f32>>,
     trigger_catchup: &mut Arc<AtomicU8>,
+    target_sample_rate: usize,
+    mut resampler: &mut Converter<CountingSignal, Sinc<[f32; 16]>>,
 ) {
-    if source.try_grant(data.len()).unwrap() {
-        let buf = source.view();
+    let input_len = (data.len() as f32 * (48_000.0 / target_sample_rate as f32)) as usize;
 
-        let offs = buf.len() - data.len();
+    if source.try_grant(input_len).unwrap() {
+        let input_view = source.view();
+
+        let offs = input_view.len() - input_len;
 
         let allowed_latency = 2;
 
@@ -349,21 +395,23 @@ fn do_write_1<T: Sample>(
             )
             .unwrap()
             > 0)
-            && offs >= (data.len() * allowed_latency)
+            && offs >= (input_len * allowed_latency)
         {
             tracing::debug!("Skipping {} samples so the output catches up", offs);
-            buf[offs..][..data.len()]
-                .iter()
-                .map(<T as Sample>::from)
+            resampler.source_mut().prep(&input_view[offs..]);
+
+            Signal::until_exhausted(resampler)
+                .map(|x| <T as Sample>::from(&x))
                 .collect_slice(data);
-            let len = buf.len();
+            let len = input_view.len();
             source.release(len);
         } else {
-            buf[..data.len()]
-                .iter()
-                .map(<T as Sample>::from)
+            resampler.source_mut().prep(input_view);
+
+            Signal::until_exhausted(&mut resampler)
+                .map(|x| <T as Sample>::from(&x))
                 .collect_slice(data);
-            source.release(data.len());
+            source.release(resampler.source().index);
         }
     } else {
         data.fill(<T as Sample>::from(&0.0f32));
@@ -376,35 +424,53 @@ fn do_write_2<T: Sample>(
     data: &mut [T],
     source: &mut splittable::View<Source<f32>>,
     trigger_catchup: &mut Arc<AtomicU8>,
+    target_sample_rate: usize,
+    resampler: &mut Converter<CountingSignal, Sinc<[f32; 16]>>,
 ) {
-    let buf_len = data.len() / 2;
+    let input_len = ((data.len() / 2) as f32 * (48_000.0 / target_sample_rate as f32)) as usize;
 
-    if source.try_grant(buf_len).unwrap() {
-        let buf = source.view();
+    if source.try_grant(input_len).unwrap() {
+        let input_view = source.view();
 
-        let offs = buf.len() - buf_len;
+        let offs = input_view.len() - input_len;
 
         let allowed_latency = 2;
 
-        if (trigger_catchup.fetch_sub(1, std::sync::atomic::Ordering::Relaxed) > 0)
-            && offs >= (buf_len * allowed_latency)
+        if (trigger_catchup
+            .fetch_update(
+                atomig::Ordering::SeqCst,
+                std::sync::atomic::Ordering::SeqCst,
+                |x| Some(x.saturating_sub(1)),
+            )
+            .unwrap()
+            > 0)
+            && offs >= (input_len * allowed_latency)
         {
-            tracing::debug!("Skipping {} samples so the output catches up", offs);
-            buf[offs..][..buf_len]
-                .iter()
-                .interleave(buf[offs..][..buf_len].iter())
-                .map(<T as Sample>::from)
-                .collect_slice(data);
-            let len = buf.len();
+            tracing::info!(
+                "Skipping {} samples so the output catches up (max buffer: {})",
+                offs,
+                input_len * allowed_latency
+            );
+            resampler.source_mut().prep(&input_view[offs..]);
+
+            for o in data.chunks_mut(2) {
+                let x = <T as Sample>::from(&resampler.next());
+
+                o.fill(x);
+            }
+
+            let len = input_view.len();
             source.release(len);
         } else {
-            buf[..buf_len]
-                .iter()
-                .interleave(buf[..buf_len].iter())
-                .map(<T as Sample>::from)
-                .collect_slice(data);
+            resampler.source_mut().prep(input_view);
 
-            source.release(buf_len);
+            for o in data.chunks_mut(2) {
+                let x = <T as Sample>::from(&resampler.next());
+
+                o.fill(x);
+            }
+
+            source.release(resampler.source().index);
         }
     } else {
         data.fill(<T as Sample>::from(&0.0f32));
@@ -418,13 +484,10 @@ fn output_stream(
 ) -> color_eyre::Result<(cpal::Stream, Sink<f32>, Arc<AtomicU8>)> {
     let (cfg, fmt) = if let Some(cfg) = dev
         .supported_output_configs()?
-        .filter(|cfg| {
-            cfg.min_sample_rate() <= SampleRate(48000) && cfg.max_sample_rate() >= SampleRate(48000)
-        })
-        .sorted_by_key(|cfg| cfg.channels())
+        .sorted_by_key(|cfg| (cfg.channels(), cfg.max_sample_rate().0.abs_diff(48_000)))
         .next()
     {
-        let cfg = cfg.with_sample_rate(SampleRate(48000));
+        let cfg = cfg.with_max_sample_rate();
         // let buf_size = match cfg.buffer_size() {
         //     cpal::SupportedBufferSize::Range { min, max: _ } => BufferSize::Fixed(*min),
         //     cpal::SupportedBufferSize::Unknown => BufferSize::Default,
@@ -437,7 +500,8 @@ fn output_stream(
         (cfg, fmt)
     } else {
         return Err(color_eyre::eyre::eyre!(
-            "Couldn't find a valid config for device"
+            "Couldn't find a valid config for device, supported: {:#?}",
+            dev.supported_output_configs().unwrap().collect::<Vec<_>>()
         ));
     };
 
@@ -451,38 +515,95 @@ fn output_stream(
     let mut trigger_catchup = Arc::new(AtomicU8::new(0));
     let trigger_catchup_out = Arc::clone(&trigger_catchup);
 
+    let target_sample_rate = cfg.sample_rate.0 as usize;
+    let sinc = Sinc::new(dasp_ring_buffer::Fixed::from([0.0; 16]));
+    let mut resampler = Converter::from_hz_to_hz(
+        CountingSignal::new(),
+        sinc,
+        48_000.0,
+        target_sample_rate as f64,
+    );
+
     let stream = match cfg.channels {
         1 => match fmt {
             cpal::SampleFormat::I16 => dev.build_output_stream(
                 &cfg,
-                move |data: &mut [i16], _| do_write_1(data, &mut source, &mut trigger_catchup),
+                move |data: &mut [i16], _| {
+                    do_write_1(
+                        data,
+                        &mut source,
+                        &mut trigger_catchup,
+                        target_sample_rate,
+                        &mut resampler,
+                    )
+                },
                 err_cb,
             )?,
             cpal::SampleFormat::U16 => dev.build_output_stream(
                 &cfg,
-                move |data: &mut [u16], _| do_write_1(data, &mut source, &mut trigger_catchup),
+                move |data: &mut [u16], _| {
+                    do_write_1(
+                        data,
+                        &mut source,
+                        &mut trigger_catchup,
+                        target_sample_rate,
+                        &mut resampler,
+                    )
+                },
                 err_cb,
             )?,
             cpal::SampleFormat::F32 => dev.build_output_stream(
                 &cfg,
-                move |data: &mut [f32], _| do_write_1(data, &mut source, &mut trigger_catchup),
+                move |data: &mut [f32], _| {
+                    do_write_1(
+                        data,
+                        &mut source,
+                        &mut trigger_catchup,
+                        target_sample_rate,
+                        &mut resampler,
+                    )
+                },
                 err_cb,
             )?,
         },
         2 => match fmt {
             cpal::SampleFormat::I16 => dev.build_output_stream(
                 &cfg,
-                move |data: &mut [i16], _| do_write_2(data, &mut source, &mut trigger_catchup),
+                move |data: &mut [i16], _| {
+                    do_write_2(
+                        data,
+                        &mut source,
+                        &mut trigger_catchup,
+                        target_sample_rate,
+                        &mut resampler,
+                    )
+                },
                 err_cb,
             )?,
             cpal::SampleFormat::U16 => dev.build_output_stream(
                 &cfg,
-                move |data: &mut [u16], _| do_write_2(data, &mut source, &mut trigger_catchup),
+                move |data: &mut [u16], _| {
+                    do_write_2(
+                        data,
+                        &mut source,
+                        &mut trigger_catchup,
+                        target_sample_rate,
+                        &mut resampler,
+                    )
+                },
                 err_cb,
             )?,
             cpal::SampleFormat::F32 => dev.build_output_stream(
                 &cfg,
-                move |data: &mut [f32], _| do_write_2(data, &mut source, &mut trigger_catchup),
+                move |data: &mut [f32], _| {
+                    do_write_2(
+                        data,
+                        &mut source,
+                        &mut trigger_catchup,
+                        target_sample_rate,
+                        &mut resampler,
+                    )
+                },
                 err_cb,
             )?,
         },

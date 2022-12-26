@@ -18,6 +18,7 @@ color-eyre = "0.6.2"
 console-subscriber = { version = "0.1.8", optional = true }
 cpal = { version = "0.14.2", features = ["jack"] }
 dasp_envelope = { version = "0.11.0", features = ["peak"] }
+dasp_frame = "0.11.0"
 dasp_interpolate = { version = "0.11.0", features = ["sinc"] }
 dasp_peak = "0.11.0"
 dasp_ring_buffer = "0.11.0"

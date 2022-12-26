@@ -1320,6 +1320,7 @@ dependencies = [
  "console-subscriber",
  "cpal",
  "dasp_envelope",
+ "dasp_frame",
  "dasp_interpolate",
  "dasp_peak",
  "dasp_ring_buffer",
