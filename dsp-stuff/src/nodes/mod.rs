@@ -2,23 +2,23 @@ use std::sync::Arc;
 
 use crate::{
     ids::NodeId,
-    node::{Node, Perform, NodeStatic},
+    node::{Node, NodeStatic, Perform},
 };
 
 use self::{
-    add::Add, biquad::BiQuad, chebyshev::Chebyshev, distort::Distort, envelope::Envelope,
-    gain::Gain, high_pass::HighPass, input::Input, low_pass::LowPass, mix::Mix, muff::Muff,
-    output::Output, reverb::Reverb, signal_gen::SignalGen, spectrogram::Spectrogram,
-    wave_view::WaveView, fir::FIR,
+    add::Add, biquad::BiQuad, chebyshev::Chebyshev, demux::Demux, distort::Distort,
+    envelope::Envelope, fir::FIR, gain::Gain, high_pass::HighPass, input::Input, low_pass::LowPass,
+    mix::Mix, muff::Muff, mux::Mux, output::Output, overdrive::Overdrive, reverb::Reverb,
+    signal_gen::SignalGen, spectrogram::Spectrogram, wave_view::WaveView,
 };
 
-pub mod fir;
 pub mod add;
 pub mod biquad;
 pub mod chebyshev;
 pub mod demux;
 pub mod distort;
 pub mod envelope;
+pub mod fir;
 pub mod gain;
 pub mod high_pass;
 pub mod input;
@@ -76,7 +76,9 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<Nodes>)] = &[
     ("Chebyshev", |id| Arc::new(Nodes::from(Chebyshev::new(id)))),
     ("Reverb", |id| Arc::new(Nodes::from(Reverb::new(id)))),
     ("Wave view", |id| Arc::new(Nodes::from(WaveView::new(id)))),
-    ("Spectrogram", |id| Arc::new(Nodes::from(Spectrogram::new(id)))),
+    ("Spectrogram", |id| {
+        Arc::new(Nodes::from(Spectrogram::new(id)))
+    }),
     ("Signal gen", |id| Arc::new(Nodes::from(SignalGen::new(id)))),
     ("Low pass", |id| Arc::new(Nodes::from(LowPass::new(id)))),
     ("High pass", |id| Arc::new(Nodes::from(HighPass::new(id)))),
@@ -85,23 +87,31 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<Nodes>)] = &[
 ];
 
 pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<Nodes>)] = &[
-    ("input", |v| Arc::new(input::Input::restore(v))),
-    ("output", |v| Arc::new(output::Output::restore(v))),
-    ("gain", |v| Arc::new(gain::Gain::restore(v))),
-    ("mix", |v| Arc::new(mix::Mix::restore(v))),
-    ("mux", |v| Arc::new(mux::Mux::restore(v))),
-    ("demux", |v| Arc::new(demux::Demux::restore(v))),
-    ("add", |v| Arc::new(add::Add::restore(v))),
-    ("distort", |v| Arc::new(distort::Distort::restore(v))),
-    ("overdrive", |v| Arc::new(overdrive::Overdrive::restore(v))),
-    ("biquad", |v| Arc::new(biquad::BiQuad::restore(v))),
+    ("input", |v| Arc::new(Nodes::from(Input::restore(v)))),
+    ("output", |v| Arc::new(Nodes::from(Output::restore(v)))),
+    ("gain", |v| Arc::new(Nodes::from(Gain::restore(v)))),
+    ("mix", |v| Arc::new(Nodes::from(Mix::restore(v)))),
+    ("mux", |v| Arc::new(Nodes::from(Mux::restore(v)))),
+    ("demux", |v| Arc::new(Nodes::from(Demux::restore(v)))),
+    ("add", |v| Arc::new(Nodes::from(Add::restore(v)))),
+    ("distort", |v| Arc::new(Nodes::from(Distort::restore(v)))),
+    ("overdrive", |v| {
+        Arc::new(Nodes::from(Overdrive::restore(v)))
+    }),
+    ("biquad", |v| Arc::new(Nodes::from(BiQuad::restore(v)))),
     #[cfg(feature = "gpl_effects")]
     ("muff", |v| Arc::new(Nodes::from(Muff::restore(v)))),
-    ("chebyshev", |v| Arc::new(Nodes::from(Chebyshev::restore(v)))),
+    ("chebyshev", |v| {
+        Arc::new(Nodes::from(Chebyshev::restore(v)))
+    }),
     ("reverb", |v| Arc::new(Nodes::from(Reverb::restore(v)))),
     ("wave_view", |v| Arc::new(Nodes::from(WaveView::restore(v)))),
-    ("spectrogram", |v| Arc::new(Nodes::from(Spectrogram::restore(v)))),
-    ("signal_gen", |v| Arc::new(Nodes::from(SignalGen::restore(v)))),
+    ("spectrogram", |v| {
+        Arc::new(Nodes::from(Spectrogram::restore(v)))
+    }),
+    ("signal_gen", |v| {
+        Arc::new(Nodes::from(SignalGen::restore(v)))
+    }),
     ("low_pass", |v| Arc::new(Nodes::from(LowPass::restore(v)))),
     ("high_pass", |v| Arc::new(Nodes::from(HighPass::restore(v)))),
     ("envelope", |v| Arc::new(Nodes::from(Envelope::restore(v)))),

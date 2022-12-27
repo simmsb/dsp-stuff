@@ -116,7 +116,7 @@ impl FIR {
                     let packet = match reader.next_packet() {
                         Ok(packet) => packet,
                         Err(e) => {
-                            info!("Bad decode: {e:?}");
+                            info!("Bad decode after {} samples: {e:?}", samples.len());
                             break;
                         }
                     };
@@ -152,17 +152,22 @@ impl FIR {
                     }
                 }
 
-                let sinc = Sinc::new(dasp_ring_buffer::Fixed::from([0.0; 16]));
+                *self.taps.lock().unwrap() = if sample_rate != 48_000 {
+                    let sinc = Sinc::new(dasp_ring_buffer::Fixed::from([0.0; 16]));
 
-                info!("Resampling taps from {sample_rate}Hz to 48_000Hz");
+                    info!("Resampling taps from {sample_rate}Hz to 48_000Hz");
 
-                let taps = dasp_signal::from_iter(samples)
-                    .from_hz_to_hz(sinc, sample_rate as f64, 48_000.0)
-                    .until_exhausted()
-                    .collect::<Vec<f64>>();
+                    let taps = dasp_signal::from_iter(samples)
+                        .from_hz_to_hz(sinc, sample_rate as f64, 48_000.0)
+                        .until_exhausted()
+                        .collect::<Vec<f64>>();
+
+                    taps
+                } else {
+                    samples
+                };
 
                 *file_name = Some(path.to_string_lossy().to_string());
-                *self.taps.lock().unwrap() = taps;
             }
         }
     }
@@ -181,11 +186,11 @@ impl SimpleNode for FIR {
             Mode::Balanced => 1.0,
         };
 
-        for (in_, out) in zip(input.iter().rev(), output.iter_mut().rev()) {
-            state.push_front(*in_);
+        for (in_, out) in zip(input.iter(), output.iter_mut()) {
+            state.push_back(*in_);
 
             if state.len() > taps.len() {
-                state.pop_back();
+                state.pop_front();
             }
 
             let val = zip(state.iter().chain(iter::repeat(&0.0)), taps.iter())
