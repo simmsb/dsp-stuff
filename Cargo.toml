@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
         "dsp-stuff",
         "dsp-stuff-derive",

@@ -26,7 +26,7 @@ dasp_signal = "0.11.0"
 derivative = "2.2.0"
 dsp-stuff-derive = { path = "../dsp-stuff-derive/" }
 dsp-stuff-gpl = { git = "https://github.com/simmsb/dsp-stuff-gpl.git", optional = true, rev = "170f1680a08fd41379aa49bf88a1e4553d50929c" }
-eframe = { version = "0.20.1", features = ["default_fonts", "persistence", "glow", "accesskit"], default-features = false }
+eframe = { version = "0.20.1", features = ["default_fonts", "persistence", "wgpu"], default-features = false }
 egui = "0.20.1"
 # egui_nodes = { path = "../../egui_nodes/" }
 egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "cc79d0dc505ee930ded25430f4255aaa3060b6bf" }
