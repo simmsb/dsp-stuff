@@ -64,7 +64,7 @@ pub struct FIR {
     taps: Mutex<Vec<f64>>,
 
     #[dsp(default = "Mutex::new(VecDeque::new())")]
-    state: Mutex<VecDeque<f32>>,
+    state: Mutex<VecDeque<f64>>,
 }
 
 impl FIR {
@@ -157,14 +157,19 @@ impl FIR {
 
                     tracing::info!("Resampling taps from {sample_rate}Hz to 48_000Hz");
 
-                    let taps = dasp_signal::from_iter(samples)
+                    let mut taps = dasp_signal::from_iter(samples)
                         .from_hz_to_hz(sinc, sample_rate as f64, 48_000.0)
                         .until_exhausted()
                         .collect::<Vec<f64>>();
 
+                    taps.reverse();
+
                     taps
                 } else {
-                    samples
+                    let mut taps = samples;
+                    taps.reverse();
+
+                    taps
                 };
 
                 *file_name = Some(path.to_string_lossy().to_string());
@@ -187,16 +192,35 @@ impl SimpleNode for FIR {
         };
 
         for (in_, out) in zip(input.iter(), output.iter_mut()) {
-            state.push_back(*in_);
+            state.push_back(*in_ as f64);
 
             if state.len() > taps.len() {
                 state.pop_front();
             }
 
-            let val = zip(state.iter().chain(iter::repeat(&0.0)), taps.iter().rev())
+            // this needs to be split because the auto-vectoriser craps out with VecDeque's
+            // iterator
+            let (a, b) = state.as_slices();
+            let n_a = a.len();
+
+            let a = zip(a.iter(), taps.iter())
                 .map(|(x, c)| *x as f64 * c)
                 .sum::<f64>() as f32;
 
+            let b = if n_a < taps.len() {
+                zip(b.iter(), taps[n_a..].iter())
+                    .map(|(x, c)| *x as f64 * c)
+                    .sum::<f64>() as f32
+            } else {
+                0.0
+            };
+
+            let val = a + b;
+
+            // let val = zip(state.iter(), taps.iter())
+            //     .map(|(x, c)| *x as f64 * c)
+            //     .sum::<f64>() as f32;
+            //
             *out = val * divisor;
         }
     }
