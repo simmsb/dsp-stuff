@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 )]
 #[repr(u8)]
 enum Mode {
+    HardClip,
     SoftClip,
     Tanh,
     RecipSoftClip,
@@ -49,6 +50,24 @@ pub struct Distort {
     mode: Atomic<Mode>,
 }
 
+fn clip(sample: f32) -> f32 {
+    if sample < -1.0 {
+        -1.0
+    } else if sample > 1.0 {
+        1.0
+    } else {
+        sample
+    }
+}
+
+fn do_hard_clip(sample: f32, level: f32) -> f32 {
+    if level < 0.001 {
+        return sample;
+    }
+
+    clip(sample * level) / level
+}
+
 fn do_soft_clip(sample: f32, level: f32) -> f32 {
     if level < 0.001 {
         return sample;
@@ -63,7 +82,7 @@ fn do_soft_clip(sample: f32, level: f32) -> f32 {
         -2.0 / 3.0
     };
 
-    sample / level
+    clip(sample) / level
 }
 
 fn apply(f: fn(f32, f32) -> f32, input: &[f32], output: &mut [f32], level: &[f32]) {
@@ -136,7 +155,7 @@ fn fuzz(input: &[f32], output: &mut [f32], level: &[f32]) {
         .iter()
         .zip(level)
         .map(|(x, level)| {
-            let q = x * level / mx;
+            let q = clip(x * level) / mx;
             (1.0 - q.copysign(-1.0).exp()).copysign(-1.0)
         })
         .collect_slice(&mut z);
@@ -145,7 +164,7 @@ fn fuzz(input: &[f32], output: &mut [f32], level: &[f32]) {
 
     let mut y = [0.0; BUF_SIZE];
 
-    z.iter().map(|x| x * mx / mz).collect_slice(&mut y);
+    z.iter().map(|x| clip(x * mx) / mz).collect_slice(&mut y);
 
     let my = y.iter().map(|x| x.abs()).max_by(f32::total_cmp).unwrap();
 
@@ -163,6 +182,7 @@ impl SimpleNode for Distort {
         let mode = self.mode.load(std::sync::atomic::Ordering::Relaxed);
 
         match mode {
+            Mode::HardClip => apply(do_hard_clip, input, output, &level),
             Mode::SoftClip => apply(do_soft_clip, input, output, &level),
             Mode::Tanh => apply(do_tanh, input, output, &level),
             Mode::RecipSoftClip => apply(do_recip_soft_clip, input, output, &level),

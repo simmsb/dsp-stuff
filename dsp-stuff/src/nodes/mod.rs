@@ -16,6 +16,7 @@ pub mod fir;
 pub mod add;
 pub mod biquad;
 pub mod chebyshev;
+pub mod demux;
 pub mod distort;
 pub mod envelope;
 pub mod gain;
@@ -25,7 +26,9 @@ pub mod low_pass;
 pub mod mix;
 #[cfg(feature = "gpl_effects")]
 pub mod muff;
+pub mod mux;
 pub mod output;
+pub mod overdrive;
 pub mod reverb;
 pub mod signal_gen;
 pub mod spectrogram;
@@ -38,8 +41,11 @@ pub enum Nodes {
     Output,
     Gain,
     Mix,
+    Mux,
+    Demux,
     Add,
     Distort,
+    Overdrive,
     BiQuad,
     #[cfg(feature = "gpl_effects")]
     Muff,
@@ -59,8 +65,11 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<Nodes>)] = &[
     ("Output", |id| Arc::new(Nodes::from(Output::new(id)))),
     ("Gain", |id| Arc::new(Nodes::from(Gain::new(id)))),
     ("Mix", |id| Arc::new(Nodes::from(Mix::new(id)))),
+    ("Mux", |id| Arc::new(Nodes::from(Mux::new(id)))),
+    ("Demux", |id| Arc::new(Nodes::from(Demux::new(id)))),
     ("Add", |id| Arc::new(Nodes::from(Add::new(id)))),
     ("Distort", |id| Arc::new(Nodes::from(Distort::new(id)))),
+    ("Overdrive", |id| Arc::new(Nodes::from(Overdrive::new(id)))),
     ("Biquad", |id| Arc::new(Nodes::from(BiQuad::new(id)))),
     #[cfg(feature = "gpl_effects")]
     ("Muff", |id| Arc::new(Nodes::from(Muff::new(id)))),
@@ -76,13 +85,16 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<Nodes>)] = &[
 ];
 
 pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<Nodes>)] = &[
-    ("input", |v| Arc::new(Nodes::from(Input::restore(v)))),
-    ("output", |v| Arc::new(Nodes::from(Output::restore(v)))),
-    ("gain", |v| Arc::new(Nodes::from(Gain::restore(v)))),
-    ("mix", |v| Arc::new(Nodes::from(Mix::restore(v)))),
-    ("add", |v| Arc::new(Nodes::from(Add::restore(v)))),
-    ("distort", |v| Arc::new(Nodes::from(Distort::restore(v)))),
-    ("biquad", |v| Arc::new(Nodes::from(BiQuad::restore(v)))),
+    ("input", |v| Arc::new(input::Input::restore(v))),
+    ("output", |v| Arc::new(output::Output::restore(v))),
+    ("gain", |v| Arc::new(gain::Gain::restore(v))),
+    ("mix", |v| Arc::new(mix::Mix::restore(v))),
+    ("mux", |v| Arc::new(mux::Mux::restore(v))),
+    ("demux", |v| Arc::new(demux::Demux::restore(v))),
+    ("add", |v| Arc::new(add::Add::restore(v))),
+    ("distort", |v| Arc::new(distort::Distort::restore(v))),
+    ("overdrive", |v| Arc::new(overdrive::Overdrive::restore(v))),
+    ("biquad", |v| Arc::new(biquad::BiQuad::restore(v))),
     #[cfg(feature = "gpl_effects")]
     ("muff", |v| Arc::new(Nodes::from(Muff::restore(v)))),
     ("chebyshev", |v| Arc::new(Nodes::from(Chebyshev::restore(v)))),
