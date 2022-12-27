@@ -14,7 +14,6 @@ use symphonia_core::formats::{FormatOptions, FormatReader};
 use symphonia_core::io::{MediaSource, MediaSourceStream};
 use symphonia_core::meta::MetadataOptions;
 use symphonia_core::probe::Hint;
-use tracing::info;
 
 use crate::ids::NodeId;
 use crate::node::{PortStorage, SimpleNode};
@@ -116,7 +115,7 @@ impl FIR {
                     let packet = match reader.next_packet() {
                         Ok(packet) => packet,
                         Err(e) => {
-                            info!("Bad decode after {} samples: {e:?}", samples.len());
+                            tracing::info!("Bad decode after {} samples: {e:?}", samples.len());
                             break;
                         }
                     };
@@ -133,17 +132,18 @@ impl FIR {
                         Ok(decoded) => {
                             let spec = *decoded.spec();
 
-                            if spec.channels.count() > 1 {
-                                panic!("Single channel wavs thanks");
-                            }
-
                             // Get the capacity of the decoded buffer. Note: This is capacity, not length!
                             let duration = decoded.capacity() as u64;
+                            let num_channels = spec.channels.count();
 
                             let mut buf = SampleBuffer::<f64>::new(duration, spec);
                             buf.copy_interleaved_ref(decoded);
 
-                            samples.extend_from_slice(buf.samples());
+                            samples.extend(
+                                buf.samples()
+                                    .chunks(num_channels)
+                                    .map(|s| s.iter().sum::<f64>() / num_channels as f64),
+                            )
                         }
                         Err(symphonia_core::errors::Error::DecodeError(e)) => {
                             panic!("Bad decode: {e:?}")
@@ -155,7 +155,7 @@ impl FIR {
                 *self.taps.lock().unwrap() = if sample_rate != 48_000 {
                     let sinc = Sinc::new(dasp_ring_buffer::Fixed::from([0.0; 16]));
 
-                    info!("Resampling taps from {sample_rate}Hz to 48_000Hz");
+                    tracing::info!("Resampling taps from {sample_rate}Hz to 48_000Hz");
 
                     let taps = dasp_signal::from_iter(samples)
                         .from_hz_to_hz(sinc, sample_rate as f64, 48_000.0)
@@ -193,7 +193,7 @@ impl SimpleNode for FIR {
                 state.pop_front();
             }
 
-            let val = zip(state.iter().chain(iter::repeat(&0.0)), taps.iter())
+            let val = zip(state.iter().chain(iter::repeat(&0.0)), taps.iter().rev())
                 .map(|(x, c)| *x as f64 * c)
                 .sum::<f64>() as f32;
 

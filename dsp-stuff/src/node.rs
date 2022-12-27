@@ -122,7 +122,7 @@ pub trait Node: Send + Sync {
     fn save(&self) -> serde_json::Value;
 }
 
-pub trait NodeStatic: {
+pub trait NodeStatic {
     fn new(id: NodeId) -> Self
     where
         Self: Sized;
@@ -152,9 +152,11 @@ pub trait Perform: Node {
     /// This function may await things for as long as it likes, however it
     /// should probably way of quitting early if the node is modified in some
     /// way.
-    async fn perform(&self,
-                     inputs: crate::node::NodeInputs<'_, '_, '_>,
-                     outputs: crate::node::NodeOutputs<'_, '_, '_>);
+    async fn perform(
+        &self,
+        inputs: crate::node::NodeInputs<'_, '_, '_>,
+        outputs: crate::node::NodeOutputs<'_, '_, '_>,
+    );
 }
 
 pub async fn collect_and_average(
@@ -175,8 +177,6 @@ pub async fn collect_and_average(
 
         r = true;
         num_frames += 1.0;
-
-
 
         for (a, b) in output.iter_mut().zip(in_.view()[..buf_size].iter()) {
             *a += b;

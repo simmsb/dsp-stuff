@@ -1,7 +1,7 @@
 use crate::{
     devices,
     ids::{LinkId, NodeId, PortId},
-    node::{Perform, Node},
+    node::{Node, Perform},
     nodes::{self, Nodes},
     theme::{self, Theme},
     Params,

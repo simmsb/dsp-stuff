@@ -42,10 +42,13 @@ fn do_overdrive(sample: f32, boost: f32, level: f32, drive: f32) -> f32 {
     mix * level
 }
 
-fn apply(f: fn(f32, f32, f32, f32) -> f32, input: &[f32], output: &mut [f32],
-         boost: &[f32],
-         level: &[f32],
-         drive: &[f32],
+fn apply(
+    f: fn(f32, f32, f32, f32) -> f32,
+    input: &[f32],
+    output: &mut [f32],
+    boost: &[f32],
+    level: &[f32],
+    drive: &[f32],
 ) {
     itertools::izip!(input, boost, level, drive)
         .map(|(x, boost, level, drive)| f(*x, *boost, *level, *drive))

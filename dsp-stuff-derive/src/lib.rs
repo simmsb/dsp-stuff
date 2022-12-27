@@ -86,7 +86,8 @@ fn do_node(dsp: &Dsp) -> darling::Result<TokenStream> {
     let meta = do_meta(dsp);
     let getters = do_getters(&dsp.data)?;
     let render = do_render(&dsp.data, &dsp.custom_render, &dsp.after_settings_change)?;
-    let (cfg_struct, save, restore) = do_save_restore(&dsp.ident, &dsp.after_settings_change, &dsp.data);
+    let (cfg_struct, save, restore) =
+        do_save_restore(&dsp.ident, &dsp.after_settings_change, &dsp.data);
     let new = do_new(&dsp.inputs, &dsp.outputs, &dsp.data);
     let helpers = do_slider_as_input_helpers(&dsp.data);
 
