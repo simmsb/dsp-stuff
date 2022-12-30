@@ -9,7 +9,7 @@ use self::{
     add::Add, biquad::BiQuad, chebyshev::Chebyshev, demux::Demux, distort::Distort,
     envelope::Envelope, fir::FIR, gain::Gain, high_pass::HighPass, input::Input, low_pass::LowPass,
     mix::Mix, muff::Muff, mux::Mux, output::Output, overdrive::Overdrive, reverb::Reverb,
-    signal_gen::SignalGen, spectrogram::Spectrogram, wave_view::WaveView,
+    signal_gen::SignalGen, spectrogram::Spectrogram, wave_view::WaveView, pitch::Pitch,
 };
 
 pub mod add;
@@ -33,6 +33,7 @@ pub mod reverb;
 pub mod signal_gen;
 pub mod spectrogram;
 pub mod wave_view;
+pub mod pitch;
 
 #[enum_dispatch::enum_dispatch(Perform)]
 #[enum_dispatch::enum_dispatch(Node)]
@@ -58,6 +59,7 @@ pub enum Nodes {
     HighPass,
     Envelope,
     FIR,
+    Pitch,
 }
 
 pub static NODES: &[(&str, fn(NodeId) -> Arc<Nodes>)] = &[
@@ -84,6 +86,7 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<Nodes>)] = &[
     ("High pass", |id| Arc::new(Nodes::from(HighPass::new(id)))),
     ("Envelope", |id| Arc::new(Nodes::from(Envelope::new(id)))),
     ("FIR", |id| Arc::new(Nodes::from(FIR::new(id)))),
+    ("Pitch", |id| Arc::new(Nodes::from(Pitch::new(id)))),
 ];
 
 pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<Nodes>)] = &[
@@ -116,4 +119,5 @@ pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<Nodes>)] = &[
     ("high_pass", |v| Arc::new(Nodes::from(HighPass::restore(v)))),
     ("envelope", |v| Arc::new(Nodes::from(Envelope::restore(v)))),
     ("fir", |v| Arc::new(Nodes::from(FIR::restore(v)))),
+    ("pitch", |v| Arc::new(Nodes::from(Pitch::restore(v)))),
 ];
