@@ -33,6 +33,7 @@ pub struct Reverb {
         default = "0.5"
     )]
     seconds: Atomic<f32>,
+
     #[dsp(slider(range = "0.0..=1.0"), save, default = "0.5")]
     decay: Atomic<f32>,
 

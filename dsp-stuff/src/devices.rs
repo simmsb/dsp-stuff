@@ -244,10 +244,11 @@ fn do_read_2<T: Sample>(data: &[T], sink: &mut Sink<f32>) {
     if sink.try_grant(buf_len).unwrap() {
         let buf = sink.view_mut();
         data.iter()
-            .step_by(2)
             .map(Sample::to_f32)
+            .array_chunks::<2>()
+            .map(|[a,b]| a + b)
             .collect_slice(&mut buf[..buf_len]);
-        sink.release(data.len());
+        sink.release(buf_len);
     } else {
         // println!("input fuck");
         // input will fall behind

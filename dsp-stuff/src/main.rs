@@ -1,5 +1,6 @@
 #![allow(clippy::type_complexity)]
 #![feature(async_fn_in_trait)]
+#![feature(iter_array_chunks)]
 
 use clap::Parser;
 
