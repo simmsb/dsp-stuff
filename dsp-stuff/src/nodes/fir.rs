@@ -1,17 +1,16 @@
 use std::collections::VecDeque;
-use std::iter::{self, zip};
+use std::iter::zip;
 use std::sync::Mutex;
 
 use atomig::Atomic;
 use dasp_interpolate::sinc::Sinc;
 use dasp_signal::Signal;
 use egui::Ui;
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use symphonia_core::audio::SampleBuffer;
-use symphonia_core::codecs::DecoderOptions;
-use symphonia_core::formats::{FormatOptions, FormatReader};
-use symphonia_core::io::{MediaSource, MediaSourceStream};
+
+use symphonia_core::formats::FormatOptions;
+use symphonia_core::io::MediaSourceStream;
 use symphonia_core::meta::MetadataOptions;
 use symphonia_core::probe::Hint;
 
@@ -42,9 +41,9 @@ enum Mode {
     title = "FIR Filter",
     cfg_name = "fir",
     description = "Perform a FIR operation",
-    custom_render = "FIR::render"
+    custom_render = "Fir::render"
 )]
-pub struct FIR {
+pub struct Fir {
     #[dsp(id)]
     id: NodeId,
 
@@ -67,7 +66,7 @@ pub struct FIR {
     state: Mutex<VecDeque<f64>>,
 }
 
-impl FIR {
+impl Fir {
     fn render(&self, ui: &mut Ui) {
         let mut file_name = self.file_name.lock().unwrap();
 
@@ -178,7 +177,7 @@ impl FIR {
     }
 }
 
-impl SimpleNode for FIR {
+impl SimpleNode for Fir {
     fn process(&self, inputs: crate::node::ProcessInput, mut outputs: crate::node::ProcessOutput) {
         let input = inputs.get("in").unwrap();
         let output = outputs.get("out").unwrap();
@@ -204,12 +203,12 @@ impl SimpleNode for FIR {
             let n_a = a.len();
 
             let a = zip(a.iter(), taps.iter())
-                .map(|(x, c)| *x as f64 * c)
+                .map(|(x, c)| *x * c)
                 .sum::<f64>() as f32;
 
             let b = if n_a < taps.len() {
                 zip(b.iter(), taps[n_a..].iter())
-                    .map(|(x, c)| *x as f64 * c)
+                    .map(|(x, c)| *x * c)
                     .sum::<f64>() as f32
             } else {
                 0.0

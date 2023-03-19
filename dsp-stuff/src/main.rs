@@ -18,7 +18,6 @@ pub struct Params {
     clean: bool,
 }
 
-//fn install_tracing() -> color_eyre::Result<Box<dyn Any>> {
 fn install_tracing() -> color_eyre::Result<()> {
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
@@ -65,7 +64,7 @@ fn install_tracing() -> color_eyre::Result<()> {
 fn main() -> color_eyre::Result<()> {
     let params = Params::parse();
 
-    let _guard = install_tracing()?;
+    install_tracing()?;
 
     color_eyre::install()?;
 
@@ -75,7 +74,7 @@ fn main() -> color_eyre::Result<()> {
         "DSP Stuff",
         options,
         Box::new(move |cc| Box::new(runtime::UiContext::new(cc, &params))),
-    );
+    )?;
 
     Ok(())
 }

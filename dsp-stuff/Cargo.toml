@@ -5,50 +5,51 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arc-swap = { version = "1.5.1", features = [ "serde" ] }
-async-trait = "0.1.60"
+arc-swap = { version = "1.6.0", features = [ "serde" ] }
+async-trait = "0.1.67"
 atomig = { version = "0.4.0", features = ["derive", "serde"] }
 audioviz = { version = "0.5.0", features = ["spectrum", "processor"], default-features = false }
 biquad = "0.4.2"
 bitvec = "1.0.1"
-cc = { version = "1.0.78", features = ["parallel"], default-features = false }
-clap = { version = "4.0.30", features = ["derive"] }
+cc = { version = "1.0.79", features = ["parallel"], default-features = false }
+clap = { version = "4.1.11", features = ["derive"] }
 collect_slice = "1.2.0"
 color-eyre = "0.6.2"
 console-subscriber = { version = "0.1.8", optional = true }
-cpal = { version = "0.14.2", features = ["jack"] }
+cpal = { version = "0.15.1", features = ["jack"] }
 dasp_envelope = { version = "0.11.0", features = ["peak"] }
 dasp_frame = "0.11.0"
 dasp_interpolate = { version = "0.11.0", features = ["sinc"] }
 dasp_peak = "0.11.0"
 dasp_ring_buffer = "0.11.0"
+dasp_sample = "0.11.0"
 dasp_signal = "0.11.0"
 derivative = "2.2.0"
 dsp-stuff-derive = { path = "../dsp-stuff-derive/" }
 dsp-stuff-gpl = { git = "https://github.com/simmsb/dsp-stuff-gpl.git", optional = true, rev = "170f1680a08fd41379aa49bf88a1e4553d50929c" }
-eframe = { version = "0.20.1", features = ["default_fonts", "persistence", "wgpu"], default-features = false }
-egui = "0.20.1"
+eframe = { version = "0.21.3", features = ["default_fonts", "persistence", "wgpu"], default-features = false }
+egui = "0.21.0"
 # egui_nodes = { path = "../../egui_nodes/" }
-egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git", rev = "cc79d0dc505ee930ded25430f4255aaa3060b6bf" }
+egui_nodes = { git = "https://github.com/simmsb/egui_nodes.git" }
 enum_dispatch = { git = "https://github.com/simmsb/enum_dispatch_async.git", rev = "4229f5ae3c085098600dde2a1d8760f69cc13784" }
 getrandom = { version = "0.2.8", features = ["js", "std"], default-features = false }
 itertools = "0.10.5"
 memchr = { version = "2.5.0", features = ["use_std"] }
-once_cell = "1.16.0"
+once_cell = "1.17.1"
 oneshot = "0.1.5"
 pitch-detection = { git = "https://github.com/magnetophon/pitch-detection", version = "0.3.0" }
-rfd = { version = "0.10.0", features = ["xdg-portal"], default-features = false }
+rfd = { version = "0.11.2", features = ["xdg-portal"], default-features = false }
 rivulet = { git = "https://github.com/simmsb/rivulet", rev = "b2416e5e7eb87162d693c74ed62df33e252e9647" }
 rsor = "0.1.3"
 rust-music-theory = "0.2.0"
-serde = { version = "1.0.151", features = ["derive", "rc"] }
-serde_json = "1.0.91"
+serde = { version = "1.0.157", features = ["derive", "rc"] }
+serde_json = "1.0.94"
 sharded-slab = "0.1.4"
 simple_moving_average = "0.1.2"
 strum = { version = "0.24.1", features = ["derive"] }
-symphonia = { version = "0.5.1", default-features = false, features = ["wav", "pcm"] }
-symphonia-core = "0.5.1"
-tokio = { version = "1.23.0", features = ["rt", "time", "macros", "rt-multi-thread", "tracing", "sync"] }
+symphonia = { version = "0.5.2", default-features = false, features = ["wav", "pcm"] }
+symphonia-core = "0.5.2"
+tokio = { version = "1.26.0", features = ["rt", "time", "macros", "rt-multi-thread", "tracing", "sync"] }
 tracing = "0.1.37"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }

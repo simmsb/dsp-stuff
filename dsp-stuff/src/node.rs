@@ -294,7 +294,7 @@ impl<T: SimpleNode> Perform for T {
         {
             tracing::trace!(name = self.title(), id = ?self.id(), "Waiting for {} inputs on port {}", pipes.len(), idx);
 
-            let present = collect_and_average(buf, *pipes).await;
+            let present = collect_and_average(buf, pipes).await;
             present_inputs.push(present);
         }
 

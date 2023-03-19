@@ -7,7 +7,7 @@ use crate::{
 
 use self::{
     add::Add, biquad::BiQuad, chebyshev::Chebyshev, demux::Demux, distort::Distort,
-    envelope::Envelope, fir::FIR, gain::Gain, high_pass::HighPass, input::Input, low_pass::LowPass,
+    envelope::Envelope, fir::Fir, gain::Gain, high_pass::HighPass, input::Input, low_pass::LowPass,
     mix::Mix, muff::Muff, mux::Mux, output::Output, overdrive::Overdrive, reverb::Reverb,
     signal_gen::SignalGen, spectrogram::Spectrogram, wave_view::WaveView, pitch::Pitch,
 };
@@ -58,7 +58,7 @@ pub enum Nodes {
     LowPass,
     HighPass,
     Envelope,
-    FIR,
+    Fir,
     Pitch,
 }
 
@@ -85,7 +85,7 @@ pub static NODES: &[(&str, fn(NodeId) -> Arc<Nodes>)] = &[
     ("Low pass", |id| Arc::new(Nodes::from(LowPass::new(id)))),
     ("High pass", |id| Arc::new(Nodes::from(HighPass::new(id)))),
     ("Envelope", |id| Arc::new(Nodes::from(Envelope::new(id)))),
-    ("FIR", |id| Arc::new(Nodes::from(FIR::new(id)))),
+    ("FIR", |id| Arc::new(Nodes::from(Fir::new(id)))),
     ("Pitch", |id| Arc::new(Nodes::from(Pitch::new(id)))),
 ];
 
@@ -118,6 +118,6 @@ pub static RESTORE: &[(&str, fn(serde_json::Value) -> Arc<Nodes>)] = &[
     ("low_pass", |v| Arc::new(Nodes::from(LowPass::restore(v)))),
     ("high_pass", |v| Arc::new(Nodes::from(HighPass::restore(v)))),
     ("envelope", |v| Arc::new(Nodes::from(Envelope::restore(v)))),
-    ("fir", |v| Arc::new(Nodes::from(FIR::restore(v)))),
+    ("fir", |v| Arc::new(Nodes::from(Fir::restore(v)))),
     ("pitch", |v| Arc::new(Nodes::from(Pitch::restore(v)))),
 ];

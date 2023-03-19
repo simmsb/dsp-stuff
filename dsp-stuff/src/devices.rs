@@ -1,17 +1,15 @@
 use std::{
     collections::HashMap,
-    iter::{self, zip},
     sync::{atomic::AtomicU8, Arc},
 };
 
 use collect_slice::CollectSlice;
-use color_eyre::{Help, SectionExt};
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     Sample, SampleRate,
 };
 use dasp_interpolate::sinc::Sinc;
-use dasp_ring_buffer::Fixed;
+use dasp_sample::{FromSample, ToSample};
 use dasp_signal::{interpolate::Converter, Signal};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
@@ -226,11 +224,15 @@ impl DeviceResponse {
     }
 }
 
-fn do_read_1<T: Sample>(data: &[T], sink: &mut Sink<f32>) {
+fn do_read_1<T>(data: &[T], sink: &mut Sink<f32>)
+where
+    T: Sample + ToSample<f32>,
+{
     if sink.try_grant(data.len()).unwrap() {
         let buf = sink.view_mut();
         data.iter()
-            .map(Sample::to_f32)
+            .copied()
+            .map(<T as Sample>::to_sample)
             .collect_slice(&mut buf[..data.len()]);
         sink.release(data.len());
     } else {
@@ -239,19 +241,34 @@ fn do_read_1<T: Sample>(data: &[T], sink: &mut Sink<f32>) {
     };
 }
 
-fn do_read_2<T: Sample>(data: &[T], sink: &mut Sink<f32>) {
+fn do_read_2<T>(data: &[T], sink: &mut Sink<f32>)
+where
+    T: Sample + ToSample<f32>,
+{
     let buf_len = data.len() / 2;
     if sink.try_grant(buf_len).unwrap() {
         let buf = sink.view_mut();
         data.iter()
-            .map(Sample::to_f32)
+            .copied()
+            .map(<T as Sample>::to_sample)
             .array_chunks::<2>()
-            .map(|[a,b]| a + b)
+            .map(|[a, b]| a + b)
             .collect_slice(&mut buf[..buf_len]);
         sink.release(buf_len);
     } else {
         // println!("input fuck");
         // input will fall behind
+    };
+}
+
+macro_rules! handle_inps {
+    ($fmt:ident, $dev:ident, $cfg:ident, $read_fn:ident, $sink:ident, $err_cb:ident, $($typ:ty: $tyn:tt),*) => {
+        match $fmt {
+            $(
+                cpal::SampleFormat::$tyn => { $dev.build_input_stream(&$cfg, move |data: &[$typ], _| $read_fn(data, &mut $sink), $err_cb, None)? }
+            ),*
+                f => { return Err(::color_eyre::eyre::eyre!("I don't know how to handle {} samples", f)) }
+        }
     };
 }
 
@@ -290,40 +307,42 @@ fn input_stream(
     let err_cb = |err| tracing::warn!("output message: {:#?}", err);
 
     let stream = match cfg.channels {
-        1 => match fmt {
-            cpal::SampleFormat::I16 => dev.build_input_stream(
-                &cfg,
-                move |data: &[i16], _| do_read_1(data, &mut sink),
-                err_cb,
-            )?,
-            cpal::SampleFormat::U16 => dev.build_input_stream(
-                &cfg,
-                move |data: &[u16], _| do_read_1(data, &mut sink),
-                err_cb,
-            )?,
-            cpal::SampleFormat::F32 => dev.build_input_stream(
-                &cfg,
-                move |data: &[f32], _| do_read_1(data, &mut sink),
-                err_cb,
-            )?,
-        },
-        2 => match fmt {
-            cpal::SampleFormat::I16 => dev.build_input_stream(
-                &cfg,
-                move |data: &[i16], _| do_read_2(data, &mut sink),
-                err_cb,
-            )?,
-            cpal::SampleFormat::U16 => dev.build_input_stream(
-                &cfg,
-                move |data: &[u16], _| do_read_2(data, &mut sink),
-                err_cb,
-            )?,
-            cpal::SampleFormat::F32 => dev.build_input_stream(
-                &cfg,
-                move |data: &[f32], _| do_read_2(data, &mut sink),
-                err_cb,
-            )?,
-        },
+        1 => handle_inps!(
+            fmt,
+            dev,
+            cfg,
+            do_read_1,
+            sink,
+            err_cb,
+            i8: I8,
+            i16: I16,
+            i32: I32,
+            i64: I64,
+            u8: U8,
+            u16: U16,
+            u32: U32,
+            u64: U64,
+            f32: F32,
+            f64: F64
+        ),
+        2 => handle_inps!(
+            fmt,
+            dev,
+            cfg,
+            do_read_2,
+            sink,
+            err_cb,
+            i8: I8,
+            i16: I16,
+            i32: I32,
+            i64: I64,
+            u8: U8,
+            u16: U16,
+            u32: U32,
+            u64: U64,
+            f32: F32,
+            f64: F64
+        ),
         n => {
             return Err(color_eyre::eyre::eyre!(
                 "I don't know how to support devices with {} channels, idk complain on github",
@@ -372,7 +391,7 @@ impl dasp_signal::Signal for CountingSignal {
     }
 }
 
-fn do_write_1<T: Sample + dasp_frame::Frame>(
+fn do_write_1<T: Sample + FromSample<f32> + dasp_frame::Frame>(
     data: &mut [T],
     source: &mut splittable::View<Source<f32>>,
     trigger_catchup: &mut Arc<AtomicU8>,
@@ -402,7 +421,7 @@ fn do_write_1<T: Sample + dasp_frame::Frame>(
             resampler.source_mut().prep(&input_view[offs..]);
 
             Signal::until_exhausted(resampler)
-                .map(|x| <T as Sample>::from(&x))
+                .map(|x| <T as Sample>::from_sample(x))
                 .collect_slice(data);
             let len = input_view.len();
             source.release(len);
@@ -410,18 +429,18 @@ fn do_write_1<T: Sample + dasp_frame::Frame>(
             resampler.source_mut().prep(input_view);
 
             Signal::until_exhausted(&mut resampler)
-                .map(|x| <T as Sample>::from(&x))
+                .map(|x| <T as Sample>::from_sample(x))
                 .collect_slice(data);
             source.release(resampler.source().index);
         }
     } else {
-        data.fill(<T as Sample>::from(&0.0f32));
+        data.fill(<T as Sample>::from_sample(0.0f32));
         // println!("output fuck");
         // oops
     };
 }
 
-fn do_write_2<T: Sample>(
+fn do_write_2<T: Sample + FromSample<f32>>(
     data: &mut [T],
     source: &mut splittable::View<Source<f32>>,
     trigger_catchup: &mut Arc<AtomicU8>,
@@ -455,7 +474,7 @@ fn do_write_2<T: Sample>(
             resampler.source_mut().prep(&input_view[offs..]);
 
             for o in data.chunks_mut(2) {
-                let x = <T as Sample>::from(&resampler.next());
+                let x = <T as Sample>::from_sample(resampler.next());
 
                 o.fill(x);
             }
@@ -466,7 +485,7 @@ fn do_write_2<T: Sample>(
             resampler.source_mut().prep(input_view);
 
             for o in data.chunks_mut(2) {
-                let x = <T as Sample>::from(&resampler.next());
+                let x = <T as Sample>::from_sample(resampler.next());
 
                 o.fill(x);
             }
@@ -474,9 +493,20 @@ fn do_write_2<T: Sample>(
             source.release(resampler.source().index);
         }
     } else {
-        data.fill(<T as Sample>::from(&0.0f32));
+        data.fill(<T as Sample>::from_sample(0.0f32));
         // println!("output fuck");
         // oops
+    };
+}
+
+macro_rules! handle_outs {
+    ($fmt:ident, $dev:ident, $cfg:ident, $write_fn:ident, $source:ident, $trigger_catchup:ident, $target_sample_rate:ident, $resampler:ident, $err_cb:ident, $($typ:ty: $tyn:tt),*) => {
+        match $fmt {
+            $(
+                cpal::SampleFormat::$tyn => { $dev.build_output_stream(&$cfg, move |data: &mut [$typ], _| $write_fn(data, &mut $source, &mut $trigger_catchup, $target_sample_rate, &mut $resampler), $err_cb, None)? }
+            ),*
+                f => { return Err(::color_eyre::eyre::eyre!("I don't know how to handle {} samples", f)) }
+        }
     };
 }
 
@@ -526,88 +556,48 @@ fn output_stream(
     );
 
     let stream = match cfg.channels {
-        1 => match fmt {
-            cpal::SampleFormat::I16 => dev.build_output_stream(
-                &cfg,
-                move |data: &mut [i16], _| {
-                    do_write_1(
-                        data,
-                        &mut source,
-                        &mut trigger_catchup,
-                        target_sample_rate,
-                        &mut resampler,
-                    )
-                },
-                err_cb,
-            )?,
-            cpal::SampleFormat::U16 => dev.build_output_stream(
-                &cfg,
-                move |data: &mut [u16], _| {
-                    do_write_1(
-                        data,
-                        &mut source,
-                        &mut trigger_catchup,
-                        target_sample_rate,
-                        &mut resampler,
-                    )
-                },
-                err_cb,
-            )?,
-            cpal::SampleFormat::F32 => dev.build_output_stream(
-                &cfg,
-                move |data: &mut [f32], _| {
-                    do_write_1(
-                        data,
-                        &mut source,
-                        &mut trigger_catchup,
-                        target_sample_rate,
-                        &mut resampler,
-                    )
-                },
-                err_cb,
-            )?,
-        },
-        2 => match fmt {
-            cpal::SampleFormat::I16 => dev.build_output_stream(
-                &cfg,
-                move |data: &mut [i16], _| {
-                    do_write_2(
-                        data,
-                        &mut source,
-                        &mut trigger_catchup,
-                        target_sample_rate,
-                        &mut resampler,
-                    )
-                },
-                err_cb,
-            )?,
-            cpal::SampleFormat::U16 => dev.build_output_stream(
-                &cfg,
-                move |data: &mut [u16], _| {
-                    do_write_2(
-                        data,
-                        &mut source,
-                        &mut trigger_catchup,
-                        target_sample_rate,
-                        &mut resampler,
-                    )
-                },
-                err_cb,
-            )?,
-            cpal::SampleFormat::F32 => dev.build_output_stream(
-                &cfg,
-                move |data: &mut [f32], _| {
-                    do_write_2(
-                        data,
-                        &mut source,
-                        &mut trigger_catchup,
-                        target_sample_rate,
-                        &mut resampler,
-                    )
-                },
-                err_cb,
-            )?,
-        },
+        1 => handle_outs!(
+            fmt,
+            dev,
+            cfg,
+            do_write_1,
+            source,
+            trigger_catchup,
+            target_sample_rate,
+            resampler,
+            err_cb,
+            i8: I8,
+            i16: I16,
+            i32: I32,
+            i64: I64,
+            u8: U8,
+            u16: U16,
+            u32: U32,
+            u64: U64,
+            f32: F32,
+            f64: F64
+        ),
+        2 => handle_outs!(
+            fmt,
+            dev,
+            cfg,
+            do_write_2,
+            source,
+            trigger_catchup,
+            target_sample_rate,
+            resampler,
+            err_cb,
+            i8: I8,
+            i16: I16,
+            i32: I32,
+            i64: I64,
+            u8: U8,
+            u16: U16,
+            u32: U32,
+            u64: U64,
+            f32: F32,
+            f64: F64
+        ),
         n => {
             return Err(color_eyre::eyre::eyre!(
                 "I don't know how to support devices with {} channels, idk complain on github",
