@@ -1,5 +1,5 @@
 use std::{collections::HashMap, sync::Arc};
-
+use eframe::egui;
 use crate::{
     devices,
     ids::{DeviceId, NodeId, PortId},

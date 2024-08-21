@@ -1,3 +1,4 @@
+use eframe::egui;
 use std::{
     collections::{HashMap, VecDeque},
     sync::{Arc, Mutex},
@@ -239,7 +240,7 @@ impl Perform for Spectrogram {
                 resolution: None, //Some(100),
                 volume: 1.0,
                 volume_normalisation: audioviz::spectrum::config::VolumeNormalisation::Mixture,
-                position_normalisation: audioviz::spectrum::config::PositionNormalisation::Harmonic,
+                position_normalisation: audioviz::spectrum::config::PositionNormalisation::Exponential,
                 manual_position_distribution: None,
                 interpolation: audioviz::spectrum::config::Interpolation::Cubic,
             },

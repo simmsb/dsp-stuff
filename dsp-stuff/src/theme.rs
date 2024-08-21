@@ -1,3 +1,5 @@
+use eframe::egui;
+
 pub struct Theme {
     pub titlebar: egui::Color32,
     pub titlebar_hovered: egui::Color32,

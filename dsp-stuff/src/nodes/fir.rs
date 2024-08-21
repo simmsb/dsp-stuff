@@ -1,14 +1,13 @@
 use std::collections::VecDeque;
+use eframe::egui;
 use std::iter::zip;
 use std::sync::Mutex;
-
 use atomig::Atomic;
 use dasp_interpolate::sinc::Sinc;
 use dasp_signal::Signal;
 use egui::Ui;
 use serde::{Deserialize, Serialize};
 use symphonia_core::audio::SampleBuffer;
-
 use symphonia_core::formats::FormatOptions;
 use symphonia_core::io::MediaSourceStream;
 use symphonia_core::meta::MetadataOptions;

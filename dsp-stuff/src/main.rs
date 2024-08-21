@@ -1,5 +1,4 @@
 #![allow(clippy::type_complexity)]
-#![feature(async_fn_in_trait)]
 #![feature(iter_array_chunks)]
 
 use clap::Parser;
@@ -73,7 +72,7 @@ fn main() -> color_eyre::Result<()> {
     eframe::run_native(
         "DSP Stuff",
         options,
-        Box::new(move |cc| Box::new(runtime::UiContext::new(cc, &params))),
+        Box::new(move |cc| Ok(Box::new(runtime::UiContext::new(cc, &params)))),
     )?;
 
     Ok(())

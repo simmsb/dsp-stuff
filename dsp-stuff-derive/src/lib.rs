@@ -484,7 +484,7 @@ fn do_render(
                 };
 
                 quote! {
-                    let r = ui.add(::egui::Slider::from_get_set(#range, |v| {
+                    let r = ui.add(::eframe::egui::Slider::from_get_set(#range, |v| {
                         if let ::std::option::Option::Some(v) = v {
                             self.#ident.store(v as _, ::std::sync::atomic::Ordering::Relaxed);
                         }
@@ -507,7 +507,7 @@ fn do_render(
                             T::iter()
                         }
 
-                        ::egui::ComboBox::new((::std::stringify!(#ident), self.id()), #label)
+                        ::eframe::egui::ComboBox::new((::std::stringify!(#ident), self.id()), #label)
                             .selected_text(<&'static ::std::primitive::str>::from(selected))
                             .show_ui(ui, |ui| {
                                for possible_selection in enum_as_iter::<#ty, _>() {
@@ -568,7 +568,7 @@ fn do_render(
     };
 
     let tokens = quote! {
-        fn render(&self, ui: &mut ::egui::Ui) {
+        fn render(&self, ui: &mut ::eframe::egui::Ui) {
             let mut changed = false;
 
             #(#rendered_fields)*

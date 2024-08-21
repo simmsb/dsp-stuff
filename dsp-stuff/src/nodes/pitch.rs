@@ -1,5 +1,5 @@
 use std::sync::Mutex;
-
+use eframe::egui;
 use atomig::Atomic;
 use egui::{FontFamily, RichText, Ui};
 use pitch_detection::detector::mcleod::McLeodDetector;

@@ -6,8 +6,9 @@ use crate::{
     theme::{self, Theme},
     Params,
 };
+use eframe::egui;
 use eframe::CreationContext;
-use egui::{pos2, Visuals};
+use eframe::egui::{pos2, UiStackInfo, ViewportCommand, Visuals};
 use egui_nodes::{AttributeFlags, ColorStyle, LinkArgs, NodeArgs, NodeConstructor, PinArgs};
 use itertools::Itertools;
 use rivulet::{
@@ -245,6 +246,7 @@ impl UiContext {
                             egui::Id::new((node.id, "title")),
                             ui.max_rect(),
                             ui.clip_rect(),
+                            UiStackInfo::new(egui::UiKind::GenericArea)
                         );
                         ui.label(format!("{} ({})", node.instance.title(), node.id.get()))
                             .on_hover_text_at_pointer(node.instance.description());
@@ -532,7 +534,7 @@ impl eframe::App for UiContext {
             self.update_nodes(ui);
         });
 
-        frame.set_window_size(ctx.used_size());
+        // ctx.send_viewport_cmd(ViewportCommand::InnerSize(ctx.used_size()));
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {

@@ -1,5 +1,5 @@
 use std::{collections::HashMap, sync::Arc};
-
+use eframe::egui;
 use once_cell::sync::Lazy;
 use rivulet::{
     circular_buffer::{Sink, Source},
